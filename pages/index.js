@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 
 const CATEGORIES_RECETTES = [
-  { id: 'dimes', label: 'Dîmes & Offrandes', icon: '🪙' },
-  { id: 'don', label: 'Dons & Prégations', icon: '🎁' },
-  { id: 'construction', label: 'Levée de fonds', icon: '🏗️' },
+  { id: 'dimes', label: 'Dimes et Offrandes', icon: '🪙' },
+  { id: 'don', label: 'Dons et Pregations', icon: '🎁' },
+  { id: 'construction', label: 'Levee de fonds', icon: '🏗️' },
   { id: 'ventes', label: 'Ventes / Livres', icon: '📚' },
 ];
 
 const CATEGORIES_DEPENSES = [
-  { id: 'charite', label: 'Aide sociale / Charité', icon: '🤝' },
-  { id: 'factures', label: 'Eau / Électricité', icon: '💡' },
-  { id: 'entretien', label: 'Entretien & Travaux', icon: '🛠️' },
+  { id: 'charite', label: 'Aide sociale / Charite', icon: '🤝' },
+  { id: 'factures', label: 'Eau / Electricite', icon: '💡' },
+  { id: 'entretien', label: 'Entretien et Travaux', icon: '🛠️' },
   { id: 'pastoral', label: 'Soutien Pastoral', icon: '👔' },
   { id: 'transport', label: 'Transport / Carburant', icon: '⛽' },
 ];
@@ -36,7 +36,7 @@ export default function Home() {
   const handleValidation = () => {
     const numericMontant = parseFloat(montant);
     if (!categorieId) {
-      alert('Veuillez sélectionner une catégorie.');
+      alert('Veuillez selectionner une categorie.');
       return;
     }
     if (numericMontant <= 0) {
@@ -50,7 +50,7 @@ export default function Home() {
       setSolde((prev) => prev - numericMontant);
     }
 
-    setSuccessMsg(`Transaction de ${numericMontant.toLocaleString()} FCFA enregistrée !`);
+    setSuccessMsg(`Transaction de ${numericMontant.toLocaleString()} FCFA enregistree !`);
     setMontant('0');
     setCategorieId('');
     setTimeout(() => setSuccessMsg(''), 3000);
@@ -61,19 +61,19 @@ export default function Home() {
   return (
     <div style={{ maxWidth: '450px', margin: '0 auto', padding: '16px', fontFamily: 'sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
       
-      {/* Affichage du Logo PNG Officiel */}
+      {/* Affichage du Logo PNG */}
       <div style={{ textAlign: 'center', marginBottom: '16px' }}>
         <img 
           src="/logo.png" 
-          alt="Logo Église" 
+          alt="Logo Eglise" 
           style={{ height: '70px', width: 'auto', objectFit: 'contain' }} 
         />
       </div>
 
-      {/* En-tête / Solde */}
+      {/* En-tete / Solde */}
       <div style={{ backgroundColor: '#0f172a', color: 'white', borderRadius: '16px', padding: '16px', marginBottom: '16px' }}>
         <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 'bold' }}>
-          Centralisation des comptes EA Région 2 • Solde Caisse
+          Centralisation des comptes EA Region 2 • Solde Caisse
         </div>
         <div style={{ fontSize: '24px', fontWeight: 'bold', marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{solde.toLocaleString()} FCFA</span>
@@ -88,7 +88,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Type : Entrée ou Sortie */}
+      {/* Type : Entree ou Sortie */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px', backgroundColor: '#e2e8f0', padding: '4px', borderRadius: '12px' }}>
         <button
           type="button"
@@ -103,7 +103,7 @@ export default function Home() {
             color: type === 'RECETTE' ? 'white' : '#475569'
           }}
         >
-          ⬇️ Entrée (+)
+          ⬇️ Entree (+)
         </button>
         <button
           type="button"
@@ -122,7 +122,7 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Mode de règlement */}
+      {/* Mode de reglement */}
       <div style={{ marginBottom: '16px' }}>
         <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
           Compte / Mode
@@ -144,16 +144,16 @@ export default function Home() {
                 color: compte === m ? 'white' : '#334155'
               }}
             >
-              {m === 'CAISSE_ESPECES' ? '💵 Espèces' : m === 'MOBILE_MONEY' ? '📱 Mobile' : '🏦 Banque'}
+              {m === 'CAISSE_ESPECES' ? '💵 Especes' : m === 'MOBILE_MONEY' ? '📱 Mobile' : '🏦 Banque'}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Liste des catégories */}
+      {/* Liste des categories */}
       <div style={{ marginBottom: '16px' }}>
         <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
-          Catégorie ({type === 'RECETTE' ? 'Entrée' : 'Sortie'})
+          Categorie ({type === 'RECETTE' ? 'Entree' : 'Sortie'})
         </label>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
           {categories.map((cat) => (
@@ -182,13 +182,13 @@ export default function Home() {
 
       {/* Affichage du Montant Saisi */}
       <div style={{ backgroundColor: 'white', border: '2px solid #cbd5e1', borderRadius: '16px', padding: '12px', marginBottom: '16px', textAlign: 'right' }}>
-        <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase' }}>Montant à saisir</div>
+        <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase' }}>Montant a saisir</div>
         <div style={{ fontSize: '28px', fontWeight: '900', color: '#0f172a' }}>
           {parseInt(montant, 10).toLocaleString()} <span style={{ fontSize: '16px', fontWeight: 'normal', color: '#64748b' }}>FCFA</span>
         </div>
       </div>
 
-      {/* Pavé Numérique Tactile */}
+      {/* Pave Numerique Tactile */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '16px' }}>
         {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'DEL'].map((btn) => (
           <button
