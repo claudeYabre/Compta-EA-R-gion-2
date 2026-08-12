@@ -7,12 +7,33 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
+// LISTE INITIALE DE DÉPART
+const INITIAL_CHURCHES = [
+  "E.A Nobéré",
+  "E.A Manga",
+  "E.A Sarogho",
+  "E.A Guéré",
+  "E.A Bindé",
+  "E.A Béré",
+  "E.A Kombissiri",
+  "E.A Zanghogo",
+  "E.A Bonheur ville",
+  "E.A Tanghin",
+  "E.A Wentenga",
+  "E.A TShalom"
+];
+
 export default function Home() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
 
+  // Églises dynamique
+  const [churches, setChurches] = useState(INITIAL_CHURCHES);
+  const [selectedChurch, setSelectedChurch] = useState('');
+  const [newChurchInput, setNewChurchInput] = useState('');
+  const [isAddingNew, setIsAddingNew] = useState(false);
+
   // Formulaire state
-  const [church, setChurch] = useState('');
   const [transactionType, setTransactionType] = useState('INCOME');
   const [accountNumber, setAccountNumber] = useState('');
   const [amount, setAmount] = useState('');
@@ -24,17 +45,63 @@ export default function Home() {
     if (!auth) {
       router.push('/login');
     } else {
+      // Charger les églises sauvegardées localement si elles existent
+      const savedChurches = localStorage.getItem('custom_churches');
+      if (savedChurches) {
+        try {
+          const parsed = JSON.parse(savedChurches);
+          setChurches(parsed);
+        } catch (e) {
+          console.error(e);
+        }
+      }
       setLoading(false);
     }
   }, [router]);
 
+  const handleChurchChange = (e) => {
+    const value = e.target.value;
+    if (value === 'ADD_NEW') {
+      setIsAddingNew(true);
+      setSelectedChurch('');
+    } else {
+      setIsAddingNew(false);
+      setSelectedChurch(value);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    let finalChurchName = selectedChurch;
+
+    // Si l'utilisateur ajoute une nouvelle église à la volée
+    if (isAddingNew) {
+      const trimmed = newChurchInput.trim();
+      if (!trimmed) {
+        setMessage('❌ Veuillez saisir le nom de la nouvelle église.');
+        return;
+      }
+      finalChurchName = trimmed;
+
+      // Ajouter la nouvelle église à la liste si pas encore présente
+      if (!churches.includes(trimmed)) {
+        const updatedList = [...churches, trimmed];
+        setChurches(updatedList);
+        localStorage.setItem('custom_churches', JSON.stringify(updatedList));
+      }
+    }
+
+    if (!finalChurchName) {
+      setMessage('❌ Veuillez sélectionner ou ajouter une église.');
+      return;
+    }
+
     setMessage('Enregistrement en cours...');
 
     const { error } = await supabase.from('financial_transactions').insert([
       {
-        church_id: church || null,
+        church_id: finalChurchName,
         transaction_type: transactionType,
         account_number: accountNumber,
         amount: parseFloat(amount),
@@ -49,6 +116,9 @@ export default function Home() {
       setAmount('');
       setDescription('');
       setAccountNumber('');
+      setNewChurchInput('');
+      setIsAddingNew(false);
+      setSelectedChurch(finalChurchName);
     }
   };
 
@@ -67,11 +137,36 @@ export default function Home() {
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: '15px' }}>
           <label><b>Église / Paroisse :</b></label>
-          <select value={church} onChange={(e) => setChurch(e.target.value)} style={{ width: '100%', padding: '10px', marginTop: '5px' }}>
+          <select 
+            value={isAddingNew ? 'ADD_NEW' : selectedChurch} 
+            onChange={handleChurchChange} 
+            style={{ width: '100%', padding: '10px', marginTop: '5px' }} 
+            required
+          >
             <option value="">-- Sélectionner une église --</option>
-            <option value="Paroisse 1">Paroisse 1</option>
-            <option value="Paroisse 2">Paroisse 2</option>
+            {churches.map((item, index) => (
+              <option key={index} value={item}>
+                {item}
+              </option>
+            ))}
+            <option value="ADD_NEW" style={{ fontWeight: 'bold', color: '#0070f3' }}>
+              ➕ Ajouter une nouvelle église...
+            </option>
           </select>
+
+          {/* Champ pour saisir le nom de la nouvelle église */}
+          {isAddingNew && (
+            <div style={{ marginTop: '10px' }}>
+              <input
+                type="text"
+                placeholder="Saisissez le nom de la nouvelle église (ex: E.A Manga 2)"
+                value={newChurchInput}
+                onChange={(e) => setNewChurchInput(e.target.value)}
+                style={{ width: '100%', padding: '10px', boxSizing: 'border-box', border: '2px solid #0070f3', borderRadius: '5px' }}
+                required
+              />
+            </div>
+          )}
         </div>
 
         <div style={{ marginBottom: '15px' }}>
