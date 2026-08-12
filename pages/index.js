@@ -50,6 +50,21 @@ const INITIAL_ACCOUNTS = [
   { code: '402', label: '402 - Amortissement et réparation sono', type: 'EXPENSE' },
 ];
 
+// Composant SVG du Logo de l'Église
+function ChurchLogo({ size = 80, opacity = 1 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 200 200" fill="none" style={{ opacity }}>
+      {/* Croix */}
+      <rect x="90" y="20" width="20" height="110" fill="#003399" />
+      <rect x="50" y="50" width="100" height="20" fill="#003399" />
+      {/* Bible Ouverte */}
+      <path d="M 20 150 Q 100 130 100 165 Q 100 130 180 150 L 180 160 Q 100 140 100 175 Q 100 140 20 160 Z" fill="#003399" />
+      {/* Colombe */}
+      <path d="M 50 80 Q 90 120 110 125 Q 130 120 170 70 Q 140 100 120 110 Q 130 90 120 80 Q 100 100 90 95 Q 70 85 50 80 Z" stroke="#003399" strokeWidth="3" fill="none" />
+    </svg>
+  );
+}
+
 export default function Home() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -66,7 +81,6 @@ export default function Home() {
   const [newAccountCode, setNewAccountCode] = useState('');
   const [newAccountLabel, setNewAccountLabel] = useState('');
 
-  // Date par défaut : Aujourd'hui (YYYY-MM-DD)
   const today = new Date().toISOString().split('T')[0];
   const [transactionDate, setTransactionDate] = useState(today);
   const [amount, setAmount] = useState('');
@@ -79,13 +93,9 @@ export default function Home() {
       router.push('/login');
     } else {
       const savedChurches = localStorage.getItem('custom_churches');
-      if (savedChurches) {
-        try { setChurches(JSON.parse(savedChurches)); } catch (e) { console.error(e); }
-      }
+      if (savedChurches) try { setChurches(JSON.parse(savedChurches)); } catch (e) {}
       const savedAccounts = localStorage.getItem('custom_accounts');
-      if (savedAccounts) {
-        try { setAccounts(JSON.parse(savedAccounts)); } catch (e) { console.error(e); }
-      }
+      if (savedAccounts) try { setAccounts(JSON.parse(savedAccounts)); } catch (e) {}
       setLoading(false);
     }
   }, [router]);
@@ -177,150 +187,205 @@ export default function Home() {
     }
   };
 
-  if (loading) return <p style={{ padding: '20px' }}>Vérification des accès...</p>;
+  if (loading) return <p style={{ padding: '20px', textAlign: 'center' }}>Vérification des accès...</p>;
 
   const filteredAccounts = accounts.filter((acc) => acc.type === transactionType);
 
   return (
-    <div style={{ maxWidth: '520px', margin: '20px auto', padding: '20px', fontFamily: 'sans-serif' }}>
-      <h2>Gestion Comptable - Culte</h2>
-      
-      {message && (
-        <p style={{ padding: '10px', borderRadius: '5px', backgroundColor: message.startsWith('✅') ? '#d4edda' : '#f8d7da', color: message.startsWith('✅') ? '#155724' : '#721c24' }}>
-          {message}
-        </p>
-      )}
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: '#f4f6fb',
+      backgroundImage: `radial-gradient(#003399 0.5px, transparent 0.5px)`,
+      backgroundSize: '24px 24px',
+      position: 'relative',
+      padding: '20px 15px',
+      fontFamily: 'Segoe UI, Roboto, sans-serif'
+    }}>
+      {/* Logo Filigrane de fond */}
+      <div style={{
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        pointerEvents: 'none',
+        zIndex: 0
+      }}>
+        <ChurchLogo size={420} opacity={0.06} />
+      </div>
 
-      <form onSubmit={handleSubmit}>
-        {/* DATE DE LA TRANSACTION */}
-        <div style={{ marginBottom: '15px' }}>
-          <label><b>Date de l'opération :</b></label>
-          <input
-            type="date"
-            value={transactionDate}
-            onChange={(e) => setTransactionDate(e.target.value)}
-            style={{ width: '100%', padding: '10px', marginTop: '5px', boxSizing: 'border-box' }}
-            required
-          />
+      <div style={{
+        maxWidth: '520px',
+        margin: '0 auto',
+        backgroundColor: '#ffffff',
+        borderRadius: '12px',
+        boxShadow: '0 10px 25px rgba(0, 51, 153, 0.08)',
+        padding: '30px 25px',
+        position: 'relative',
+        zIndex: 1,
+        borderTop: '6px solid #003399'
+      }}>
+        {/* En-tête avec Logo */}
+        <div style={{ textAlign: 'center', marginBottom: '25px' }}>
+          <ChurchLogo size={70} />
+          <h2 style={{ color: '#003399', margin: '10px 0 5px 0', fontSize: '22px' }}>Gestion Comptable</h2>
+          <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>Églises APOSTOLIQUES - Région 2</p>
         </div>
 
-        {/* ÉGLISE */}
-        <div style={{ marginBottom: '15px' }}>
-          <label><b>Église / Paroisse :</b></label>
-          <select 
-            value={isAddingNewChurch ? 'ADD_NEW' : selectedChurch} 
-            onChange={handleChurchChange} 
-            style={{ width: '100%', padding: '10px', marginTop: '5px' }} 
-            required
-          >
-            <option value="">-- Sélectionner une église --</option>
-            {churches.map((item, index) => (
-              <option key={index} value={item}>{item}</option>
-            ))}
-            <option value="ADD_NEW" style={{ fontWeight: 'bold', color: '#0070f3' }}>
-              ➕ Ajouter une nouvelle église...
-            </option>
-          </select>
+        {message && (
+          <p style={{
+            padding: '12px',
+            borderRadius: '6px',
+            backgroundColor: message.startsWith('✅') ? '#e6f4ea' : '#fce8e6',
+            color: message.startsWith('✅') ? '#137333' : '#c5221f',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            textAlign: 'center'
+          }}>
+            {message}
+          </p>
+        )}
 
-          {isAddingNewChurch && (
+        <form onSubmit={handleSubmit}>
+          {/* DATE */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ color: '#003399', fontWeight: 'bold', fontSize: '14px' }}>Date de l'opération :</label>
             <input
-              type="text"
-              placeholder="Nom de la nouvelle église"
-              value={newChurchInput}
-              onChange={(e) => setNewChurchInput(e.target.value)}
-              style={{ width: '100%', padding: '10px', marginTop: '8px', boxSizing: 'border-box', border: '2px solid #0070f3', borderRadius: '5px' }}
+              type="date"
+              value={transactionDate}
+              onChange={(e) => setTransactionDate(e.target.value)}
+              style={{ width: '100%', padding: '10px', marginTop: '6px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box' }}
               required
             />
-          )}
-        </div>
+          </div>
 
-        {/* TYPE DE MOUVEMENT */}
-        <div style={{ marginBottom: '15px' }}>
-          <label><b>Type de mouvement :</b></label>
-          <select 
-            value={transactionType} 
-            onChange={(e) => handleTypeChange(e.target.value)} 
-            style={{ width: '100%', padding: '10px', marginTop: '5px', fontWeight: 'bold' }}
-          >
-            <option value="INCOME">📥 RECETTES (Entrées)</option>
-            <option value="EXPENSE">📤 DÉPENSES (Sorties)</option>
-          </select>
-        </div>
+          {/* ÉGLISE */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ color: '#003399', fontWeight: 'bold', fontSize: '14px' }}>Église / Paroisse :</label>
+            <select 
+              value={isAddingNewChurch ? 'ADD_NEW' : selectedChurch} 
+              onChange={handleChurchChange} 
+              style={{ width: '100%', padding: '10px', marginTop: '6px', borderRadius: '6px', border: '1px solid #ccc' }} 
+              required
+            >
+              <option value="">-- Sélectionner une église --</option>
+              {churches.map((item, index) => (
+                <option key={index} value={item}>{item}</option>
+              ))}
+              <option value="ADD_NEW" style={{ fontWeight: 'bold', color: '#003399' }}>
+                ➕ Ajouter une nouvelle église...
+              </option>
+            </select>
 
-        {/* SELECTION DE COMPTE */}
-        <div style={{ marginBottom: '15px' }}>
-          <label><b>Compte comptable :</b></label>
-          <select 
-            value={isAddingNewAccount ? 'ADD_NEW_ACCOUNT' : accountNumber} 
-            onChange={(e) => {
-              if (e.target.value === 'ADD_NEW_ACCOUNT') setIsAddingNewAccount(true);
-              else { setIsAddingNewAccount(false); setAccountNumber(e.target.value); }
-            }} 
-            style={{ width: '100%', padding: '10px', marginTop: '5px' }}
-            required
-          >
-            {filteredAccounts.map((acc) => (
-              <option key={acc.code} value={acc.code}>{acc.label}</option>
-            ))}
-            <option value="ADD_NEW_ACCOUNT" style={{ fontWeight: 'bold', color: '#0070f3' }}>
-              ➕ Ajouter une nouvelle ligne (compte)...
-            </option>
-          </select>
-
-          {isAddingNewAccount && (
-            <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#f0f7ff', border: '1px solid #0070f3', borderRadius: '5px' }}>
+            {isAddingNewChurch && (
               <input
                 type="text"
-                placeholder="N° Compte (Ex: 114)"
-                value={newAccountCode}
-                onChange={(e) => setNewAccountCode(e.target.value)}
-                style={{ width: '100%', padding: '8px', marginBottom: '8px', boxSizing: 'border-box' }}
+                placeholder="Nom de la nouvelle église"
+                value={newChurchInput}
+                onChange={(e) => setNewChurchInput(e.target.value)}
+                style={{ width: '100%', padding: '10px', marginTop: '8px', boxSizing: 'border-box', border: '2px solid #003399', borderRadius: '6px' }}
                 required
               />
-              <input
-                type="text"
-                placeholder="Intitulé du compte"
-                value={newAccountLabel}
-                onChange={(e) => setNewAccountLabel(e.target.value)}
-                style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-                required
-              />
-            </div>
-          )}
+            )}
+          </div>
+
+          {/* TYPE DE MOUVEMENT */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ color: '#003399', fontWeight: 'bold', fontSize: '14px' }}>Type de mouvement :</label>
+            <select 
+              value={transactionType} 
+              onChange={(e) => handleTypeChange(e.target.value)} 
+              style={{ width: '100%', padding: '10px', marginTop: '6px', borderRadius: '6px', border: '1px solid #ccc', fontWeight: 'bold' }}
+            >
+              <option value="INCOME">📥 RECETTES (Entrées)</option>
+              <option value="EXPENSE">📤 DÉPENSES (Sorties)</option>
+            </select>
+          </div>
+
+          {/* COMPTE */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ color: '#003399', fontWeight: 'bold', fontSize: '14px' }}>Compte comptable :</label>
+            <select 
+              value={isAddingNewAccount ? 'ADD_NEW_ACCOUNT' : accountNumber} 
+              onChange={(e) => {
+                if (e.target.value === 'ADD_NEW_ACCOUNT') setIsAddingNewAccount(true);
+                else { setIsAddingNewAccount(false); setAccountNumber(e.target.value); }
+              }} 
+              style={{ width: '100%', padding: '10px', marginTop: '6px', borderRadius: '6px', border: '1px solid #ccc' }}
+              required
+            >
+              {filteredAccounts.map((acc) => (
+                <option key={acc.code} value={acc.code}>{acc.label}</option>
+              ))}
+              <option value="ADD_NEW_ACCOUNT" style={{ fontWeight: 'bold', color: '#003399' }}>
+                ➕ Ajouter une nouvelle ligne (compte)...
+              </option>
+            </select>
+
+            {isAddingNewAccount && (
+              <div style={{ marginTop: '10px', padding: '12px', backgroundColor: '#eef3ff', border: '1px solid #003399', borderRadius: '6px' }}>
+                <input
+                  type="text"
+                  placeholder="N° Compte (Ex: 114)"
+                  value={newAccountCode}
+                  onChange={(e) => setNewAccountCode(e.target.value)}
+                  style={{ width: '100%', padding: '8px', marginBottom: '8px', boxSizing: 'border-box', borderRadius: '4px', border: '1px solid #ccc' }}
+                  required
+                />
+                <input
+                  type="text"
+                  placeholder="Intitulé du compte"
+                  value={newAccountLabel}
+                  onChange={(e) => setNewAccountLabel(e.target.value)}
+                  style={{ width: '100%', padding: '8px', boxSizing: 'border-box', borderRadius: '4px', border: '1px solid #ccc' }}
+                  required
+                />
+              </div>
+            )}
+          </div>
+
+          {/* MONTANT */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ color: '#003399', fontWeight: 'bold', fontSize: '14px' }}>Montant (FCFA) :</label>
+            <input
+              type="number"
+              placeholder="Ex: 50000"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              style={{ width: '100%', padding: '10px', marginTop: '6px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+              required
+            />
+          </div>
+
+          {/* DESCRIPTION */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ color: '#003399', fontWeight: 'bold', fontSize: '14px' }}>Description / Libellé :</label>
+            <input
+              type="text"
+              placeholder="Ex: Dîmes du culte de dimanche"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              style={{ width: '100%', padding: '10px', marginTop: '6px', borderRadius: '6px', border: '1px solid #ccc', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          <button type="submit" style={{
+            width: '100%',
+            padding: '12px',
+            backgroundColor: '#003399',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            fontWeight: 'bold',
+            fontSize: '16px',
+            cursor: 'pointer'
+          }}>
+            Enregistrer la transaction
+          </button>
+        </form>
+
+        <div style={{ marginTop: '20px', textAlign: 'center' }}>
+          <a href="/bilan" style={{ color: '#003399', textDecoration: 'none', fontWeight: 'bold' }}>📊 Voir le Bilan & L'historique →</a>
         </div>
-
-        {/* MONTANT */}
-        <div style={{ marginBottom: '15px' }}>
-          <label><b>Montant (FCFA) :</b></label>
-          <input
-            type="number"
-            placeholder="Ex: 50000"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            style={{ width: '100%', padding: '10px', marginTop: '5px', boxSizing: 'border-box' }}
-            required
-          />
-        </div>
-
-        {/* DESCRIPTION */}
-        <div style={{ marginBottom: '15px' }}>
-          <label><b>Description / Libellé :</b></label>
-          <input
-            type="text"
-            placeholder="Ex: Dîmes du culte de dimanche"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            style={{ width: '100%', padding: '10px', marginTop: '5px', boxSizing: 'border-box' }}
-          />
-        </div>
-
-        <button type="submit" style={{ width: '100%', padding: '12px', backgroundColor: '#0070f3', color: 'white', border: 'none', borderRadius: '5px', fontWeight: 'bold', cursor: 'pointer' }}>
-          Enregistrer la transaction
-        </button>
-      </form>
-
-      <div style={{ marginTop: '20px', textAlign: 'center' }}>
-        <a href="/bilan" style={{ color: '#0070f3' }}>📊 Voir le Bilan & L'historique →</a>
       </div>
     </div>
   );
