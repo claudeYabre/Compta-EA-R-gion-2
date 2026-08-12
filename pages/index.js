@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Wallet, ArrowDownCircle, ArrowUpCircle, CheckCircle } from 'lucide-react';
 
 const CATEGORIES_RECETTES = [
   { id: 'dimes', label: 'Dîmes & Offrandes', icon: '🪙' },
@@ -34,7 +33,7 @@ export default function Home() {
     }
   };
 
-  const handleValidation = async () => {
+  const handleValidation = () => {
     const numericMontant = parseFloat(montant);
     if (!categorieId) {
       alert('Veuillez sélectionner une catégorie.');
@@ -60,10 +59,10 @@ export default function Home() {
   const categories = type === 'RECETTE' ? CATEGORIES_RECETTES : CATEGORIES_DEPENSES;
 
   return (
-    <div className="max-w-md mx-auto bg-slate-50 min-h-screen p-4 font-sans text-slate-800 border rounded-xl shadow-lg">
+    <div style={{ maxWidth: '450px', margin: '0 auto', padding: '16px', fontFamily: 'sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
       
       {/* En-tête avec Logo Officiel */}
-      <div className="flex items-center justify-center mb-3">
+      <div style={{ textAlign: 'center', marginBottom: '12px' }}>
         <img 
           src="/logo.png" 
           alt="Logo Église" 
@@ -72,60 +71,78 @@ export default function Home() {
       </div>
 
       {/* En-tête / Solde */}
-      <div className="bg-slate-900 text-white rounded-2xl p-4 mb-4 shadow">
-        <div className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+      <div style={{ backgroundColor: '#0f172a', color: 'white', borderRadius: '16px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 'bold' }}>
           Centralisation des comptes EA Région 2 • Solde Caisse
         </div>
-        <div className="text-2xl font-bold mt-1 flex items-center justify-between">
+        <div style={{ fontSize: '24px', fontWeight: 'bold', marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>{solde.toLocaleString()} FCFA</span>
-          <Wallet className="text-emerald-400" />
+          <span>💼</span>
         </div>
       </div>
 
       {/* Message de succès */}
       {successMsg && (
-        <div className="bg-emerald-100 border border-emerald-400 text-emerald-800 px-4 py-2 rounded-xl mb-4 flex items-center gap-2 text-sm font-semibold">
-          <CheckCircle className="w-5 h-5 text-emerald-600" />
-          {successMsg}
+        <div style={{ backgroundColor: '#d1fae5', border: '1px solid #34d399', color: '#065f46', padding: '10px', borderRadius: '12px', marginBottom: '16px', fontSize: '14px', fontWeight: 'bold' }}>
+          ✅ {successMsg}
         </div>
       )}
 
       {/* Commutateur Entrée / Sortie */}
-      <div className="grid grid-cols-2 gap-2 mb-4 bg-slate-200 p-1 rounded-xl">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px', backgroundColor: '#e2e8f0', padding: '4px', borderRadius: '12px' }}>
         <button
           type="button"
           onClick={() => { setType('RECETTE'); setCategorieId(''); }}
-          className={`py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition ${
-            type === 'RECETTE' ? 'bg-emerald-600 text-white shadow' : 'text-slate-600'
-          }`}
+          style={{
+            padding: '10px',
+            borderRadius: '8px',
+            fontWeight: 'bold',
+            border: 'none',
+            cursor: 'pointer',
+            backgroundColor: type === 'RECETTE' ? '#059669' : 'transparent',
+            color: type === 'RECETTE' ? 'white' : '#475569'
+          }}
         >
-          <ArrowDownCircle className="w-5 h-5" /> Entrée (+)
+          ⬇️ Entrée (+)
         </button>
         <button
           type="button"
           onClick={() => { setType('DEPENSE'); setCategorieId(''); }}
-          className={`py-2 rounded-lg font-bold flex items-center justify-center gap-2 transition ${
-            type === 'DEPENSE' ? 'bg-rose-600 text-white shadow' : 'text-slate-600'
-          }`}
+          style={{
+            padding: '10px',
+            borderRadius: '8px',
+            fontWeight: 'bold',
+            border: 'none',
+            cursor: 'pointer',
+            backgroundColor: type === 'DEPENSE' ? '#e11d48' : 'transparent',
+            color: type === 'DEPENSE' ? 'white' : '#475569'
+          }}
         >
-          <ArrowUpCircle className="w-5 h-5" /> Sortie (-)
+          ⬆️ Sortie (-)
         </button>
       </div>
 
       {/* Choix du Compte */}
-      <div className="mb-4">
-        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
           Compte / Mode
         </label>
-        <div className="grid grid-cols-3 gap-2">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
           {['CAISSE_ESPECES', 'MOBILE_MONEY', 'BANQUE'].map((m) => (
             <button
               key={m}
               type="button"
               onClick={() => setCompte(m)}
-              className={`py-2 px-1 text-xs font-semibold rounded-lg border transition ${
-                compte === m ? 'border-slate-800 bg-slate-800 text-white' : 'bg-white text-slate-700 border-slate-300'
-              }`}
+              style={{
+                padding: '8px 4px',
+                fontSize: '11px',
+                fontWeight: 'bold',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                cursor: 'pointer',
+                backgroundColor: compte === m ? '#1e293b' : 'white',
+                color: compte === m ? 'white' : '#334155'
+              }}
             >
               {m === 'CAISSE_ESPECES' ? '💵 Espèces' : m === 'MOBILE_MONEY' ? '📱 Mobile' : '🏦 Banque'}
             </button>
@@ -134,53 +151,60 @@ export default function Home() {
       </div>
 
       {/* Sélection Catégorie */}
-      <div className="mb-4">
-        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
           Catégorie ({type === 'RECETTE' ? 'Entrée' : 'Sortie'})
         </label>
-        <div className="grid grid-cols-2 gap-2">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
           {categories.map((cat) => (
             <button
               key={cat.id}
               type="button"
               onClick={() => setCategorieId(cat.id)}
-              className={`p-3 rounded-xl border text-left flex items-center gap-3 transition ${
-                categorieId === cat.id
-                  ? type === 'RECETTE'
-                    ? 'border-emerald-600 bg-emerald-50 ring-2 ring-emerald-600'
-                    : 'border-rose-600 bg-rose-50 ring-2 ring-rose-600'
-                  : 'bg-white border-slate-200 hover:bg-slate-100'
-              }`}
+              style={{
+                padding: '10px',
+                borderRadius: '12px',
+                border: categorieId === cat.id ? `2px solid ${type === 'RECETTE' ? '#059669' : '#e11d48'}` : '1px solid #e2e8f0',
+                backgroundColor: categorieId === cat.id ? (type === 'RECETTE' ? '#ecfdf5' : '#fff1f2') : 'white',
+                textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: 'pointer'
+              }}
             >
-              <span className="text-2xl">{cat.icon}</span>
-              <span className="text-xs font-bold text-slate-700">{cat.label}</span>
+              <span style={{ fontSize: '20px' }}>{cat.icon}</span>
+              <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#334155' }}>{cat.label}</span>
             </button>
           ))}
         </div>
       </div>
 
       {/* Affichage du Montant */}
-      <div className="bg-white border-2 border-slate-300 rounded-2xl p-3 mb-4 text-right shadow-inner">
-        <div className="text-xs text-slate-400 font-semibold uppercase">Montant à saisir</div>
-        <div className="text-3xl font-black text-slate-900">
-          {parseInt(montant, 10).toLocaleString()} <span className="text-lg font-normal text-slate-500">FCFA</span>
+      <div style={{ backgroundColor: 'white', border: '2px solid #cbd5e1', borderRadius: '16px', padding: '12px', marginBottom: '16px', textAlign: 'right' }}>
+        <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase' }}>Montant à saisir</div>
+        <div style={{ fontSize: '28px', fontWeight: '900', color: '#0f172a' }}>
+          {parseInt(montant, 10).toLocaleString()} <span style={{ fontSize: '16px', fontWeight: 'normal', color: '#64748b' }}>FCFA</span>
         </div>
       </div>
 
       {/* Pavé Numérique Tactile */}
-      <div className="grid grid-cols-3 gap-2 mb-4">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '16px' }}>
         {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'DEL'].map((btn) => (
           <button
             key={btn}
             type="button"
             onClick={() => handleKeyPress(btn)}
-            className={`py-3 rounded-xl font-bold text-lg shadow-sm border transition active:scale-95 ${
-              btn === 'C'
-                ? 'bg-rose-100 text-rose-700 border-rose-200'
-                : btn === 'DEL'
-                ? 'bg-amber-100 text-amber-700 border-amber-200'
-                : 'bg-white text-slate-800 border-slate-200 active:bg-slate-200'
-            }`}
+            style={{
+              padding: '14px',
+              borderRadius: '12px',
+              fontWeight: 'bold',
+              fontSize: '18px',
+              border: '1px solid #e2e8f0',
+              cursor: 'pointer',
+              backgroundColor: btn === 'C' ? '#ffe4e6' : btn === 'DEL' ? '#fef3c7' : 'white',
+              color: btn === 'C' ? '#be123c' : btn === 'DEL' ? '#b45309' : '#1e293b'
+            }}
           >
             {btn === 'DEL' ? '⌫' : btn}
           </button>
@@ -191,9 +215,17 @@ export default function Home() {
       <button
         type="button"
         onClick={handleValidation}
-        className={`w-full py-4 rounded-xl text-white font-bold text-lg shadow-lg transition active:scale-98 ${
-          type === 'RECETTE' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
-        }`}
+        style={{
+          width: '100%',
+          padding: '16px',
+          borderRadius: '12px',
+          color: 'white',
+          fontWeight: 'bold',
+          fontSize: '18px',
+          border: 'none',
+          cursor: 'pointer',
+          backgroundColor: type === 'RECETTE' ? '#059669' : '#e11d48'
+        }}
       >
         Enregistrer la transaction
       </button>
