@@ -61,12 +61,12 @@ export default function Home() {
   return (
     <div style={{ maxWidth: '450px', margin: '0 auto', padding: '16px', fontFamily: 'sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
       
-      {/* En-tête avec Logo Officiel */}
-      <div style={{ textAlign: 'center', marginBottom: '12px' }}>
+      {/* Affichage du Logo PNG Officiel */}
+      <div style={{ textAlign: 'center', marginBottom: '16px' }}>
         <img 
           src="/logo.png" 
           alt="Logo Église" 
-          style={{ height: '60px', width: 'auto', objectFit: 'contain' }} 
+          style={{ height: '70px', width: 'auto', objectFit: 'contain' }} 
         />
       </div>
 
@@ -81,14 +81,14 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Message de succès */}
+      {/* Message de confirmation */}
       {successMsg && (
-        <div style={{ backgroundColor: '#d1fae5', border: '1px solid #34d399', color: '#065f46', padding: '10px', borderRadius: '12px', marginBottom: '16px', fontSize: '14px', fontWeight: 'bold' }}>
+        <div style={{ backgroundColor: '#d1fae5', border: '1px solid #34d399', color: '#065f46', padding: '10px', borderRadius: '12px', marginBottom: '16px', fontSize: '14px', fontWeight: 'bold', textAlign: 'center' }}>
           ✅ {successMsg}
         </div>
       )}
 
-      {/* Commutateur Entrée / Sortie */}
+      {/* Type : Entrée ou Sortie */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px', backgroundColor: '#e2e8f0', padding: '4px', borderRadius: '12px' }}>
         <button
           type="button"
@@ -122,7 +122,7 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Choix du Compte */}
+      {/* Mode de règlement */}
       <div style={{ marginBottom: '16px' }}>
         <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
           Compte / Mode
@@ -150,7 +150,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Sélection Catégorie */}
+      {/* Liste des catégories */}
       <div style={{ marginBottom: '16px' }}>
         <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
           Catégorie ({type === 'RECETTE' ? 'Entrée' : 'Sortie'})
@@ -180,7 +180,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Affichage du Montant */}
+      {/* Affichage du Montant Saisi */}
       <div style={{ backgroundColor: 'white', border: '2px solid #cbd5e1', borderRadius: '16px', padding: '12px', marginBottom: '16px', textAlign: 'right' }}>
         <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase' }}>Montant à saisir</div>
         <div style={{ fontSize: '28px', fontWeight: '900', color: '#0f172a' }}>
@@ -211,7 +211,7 @@ export default function Home() {
         ))}
       </div>
 
-      {/* Bouton de Validation */}
+      {/* Bouton Enregistrer */}
       <button
         type="button"
         onClick={handleValidation}
