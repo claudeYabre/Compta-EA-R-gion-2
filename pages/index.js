@@ -1,3 +1,14 @@
+import { useRouter } from 'next/router'; // Assurez-vous que useRouter est importé en haut
+
+// À l'intérieur de votre fonction principal :
+const router = useRouter();
+
+useEffect(() => {
+  const auth = localStorage.getItem('isAuthenticated');
+  if (!auth) {
+    router.push('/login');
+  }
+}, []);
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
