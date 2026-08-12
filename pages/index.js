@@ -226,10 +226,20 @@ export default function Home() {
       }}>
         {/* En-tête avec Logo */}
         <div style={{ textAlign: 'center', marginBottom: '25px' }}>
-          <ChurchLogo size={70} />
-          <h2 style={{ color: '#003399', margin: '10px 0 5px 0', fontSize: '22px' }}>Gestion Comptable</h2>
-          <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>Églises APOSTOLIQUES - Région 2</p>
-        </div>
+         function ChurchLogo({ size = 80, opacity = 1 }) {
+  return (
+    <img 
+      src="/logo.png" 
+      alt="Logo Église" 
+      style={{ 
+        width: `${size}px`, 
+        height: 'auto', 
+        opacity: opacity,
+        mixBlendMode: 'multiply'
+      }} 
+    />
+  );
+}
 
         {message && (
           <p style={{
