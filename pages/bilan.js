@@ -96,3 +96,17 @@ export default function Bilan() {
     </div>
   );
 }
+function ChurchLogo({ size = 80, opacity = 1 }) {
+  return (
+    <img 
+      src="/logo.png" 
+      alt="Logo Église" 
+      style={{ 
+        width: `${size}px`, 
+        height: 'auto', 
+        opacity: opacity,
+        mixBlendMode: 'multiply'
+      }} 
+    />
+  );
+}
