@@ -7,25 +7,13 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
-// LISTE INITIALE DES ÉGLISES
 const INITIAL_CHURCHES = [
-  "E.A Nobéré",
-  "E.A Manga",
-  "E.A Sarogho",
-  "E.A Guéré",
-  "E.A Bindé",
-  "E.A Béré",
-  "E.A Kombissiri",
-  "E.A Zanghogo",
-  "E.A Bonheur ville",
-  "E.A Tanghin",
-  "E.A Wentenga",
-  "E.A TShalom"
+  "E.A Nobéré", "E.A Manga", "E.A Sarogho", "E.A Guéré", "E.A Bindé",
+  "E.A Béré", "E.A Kombissiri", "E.A Zanghogo", "E.A Bonheur ville",
+  "E.A Tanghin", "E.A Wentenga", "E.A TShalom"
 ];
 
-// PLAN COMPTABLE INITIAL ISSU DE VOTRE TABLEAU
 const INITIAL_ACCOUNTS = [
-  // RECETTES
   { code: '1', label: '1 - DIMES', type: 'INCOME' },
   { code: '2', label: '2 - offrande spéciale construction', type: 'INCOME' },
   { code: '3', label: '3 - Cotisation pour la construction', type: 'INCOME' },
@@ -33,8 +21,6 @@ const INITIAL_ACCOUNTS = [
   { code: '5', label: '5 - Dons spéciaux', type: 'INCOME' },
   { code: '6', label: '6 - Ventes des céréales', type: 'INCOME' },
   { code: '7', label: '7 - Autre Entrée', type: 'INCOME' },
-
-  // DÉPENSES (100)
   { code: '101', label: '101 - Dimes des dimes', type: 'EXPENSE' },
   { code: '102', label: '102 - Soutien du pasteur', type: 'EXPENSE' },
   { code: '103', label: '103 - Assurance maladie', type: 'EXPENSE' },
@@ -48,8 +34,6 @@ const INITIAL_ACCOUNTS = [
   { code: '111', label: '111 - Frais ONEA', type: 'EXPENSE' },
   { code: '112', label: '112 - Frais de banque', type: 'EXPENSE' },
   { code: '113', label: '113 - Soutien a des personnes en difficultés', type: 'EXPENSE' },
-
-  // DÉPENSES (200)
   { code: '201', label: '201 - Frais de formation', type: 'EXPENSE' },
   { code: '202', label: '202 - Restauration visiteurs', type: 'EXPENSE' },
   { code: '203', label: '203 - Entretien mobilier', type: 'EXPENSE' },
@@ -60,12 +44,8 @@ const INITIAL_ACCOUNTS = [
   { code: '208', label: '208 - Frais de fourniture', type: 'EXPENSE' },
   { code: '209', label: '209 - Autres', type: 'EXPENSE' },
   { code: '210', label: '210 - Construction', type: 'EXPENSE' },
-
-  // DÉPENSES (300)
   { code: '301', label: '301 - Entretien bâtiments de bâtiments', type: 'EXPENSE' },
   { code: '302', label: '302 - Entretien matériels + machines+ tam tam', type: 'EXPENSE' },
-
-  // DÉPENSES (400)
   { code: '401', label: '401 - compte de réserve', type: 'EXPENSE' },
   { code: '402', label: '402 - Amortissement et réparation sono', type: 'EXPENSE' },
 ];
@@ -74,13 +54,11 @@ export default function Home() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
 
-  // Gestion des églises
   const [churches, setChurches] = useState(INITIAL_CHURCHES);
   const [selectedChurch, setSelectedChurch] = useState('');
   const [newChurchInput, setNewChurchInput] = useState('');
   const [isAddingNewChurch, setIsAddingNewChurch] = useState(false);
 
-  // Gestion du plan comptable
   const [accounts, setAccounts] = useState(INITIAL_ACCOUNTS);
   const [transactionType, setTransactionType] = useState('INCOME');
   const [accountNumber, setAccountNumber] = useState('1');
@@ -88,7 +66,9 @@ export default function Home() {
   const [newAccountCode, setNewAccountCode] = useState('');
   const [newAccountLabel, setNewAccountLabel] = useState('');
 
-  // Saisie financière
+  // Date par défaut : Aujourd'hui (YYYY-MM-DD)
+  const today = new Date().toISOString().split('T')[0];
+  const [transactionDate, setTransactionDate] = useState(today);
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [message, setMessage] = useState('');
@@ -98,12 +78,10 @@ export default function Home() {
     if (!auth) {
       router.push('/login');
     } else {
-      // Charger églises
       const savedChurches = localStorage.getItem('custom_churches');
       if (savedChurches) {
         try { setChurches(JSON.parse(savedChurches)); } catch (e) { console.error(e); }
       }
-      // Charger comptes personnalisés
       const savedAccounts = localStorage.getItem('custom_accounts');
       if (savedAccounts) {
         try { setAccounts(JSON.parse(savedAccounts)); } catch (e) { console.error(e); }
@@ -112,14 +90,11 @@ export default function Home() {
     }
   }, [router]);
 
-  // Changement de type d'opération (Entrée / Sortie)
   const handleTypeChange = (newType) => {
     setTransactionType(newType);
     setIsAddingNewAccount(false);
     const available = accounts.filter((acc) => acc.type === newType);
-    if (available.length > 0) {
-      setAccountNumber(available[0].code);
-    }
+    if (available.length > 0) setAccountNumber(available[0].code);
   };
 
   const handleChurchChange = (e) => {
@@ -133,20 +108,9 @@ export default function Home() {
     }
   };
 
-  const handleAccountSelectChange = (e) => {
-    const val = e.target.value;
-    if (val === 'ADD_NEW_ACCOUNT') {
-      setIsAddingNewAccount(true);
-    } else {
-      setIsAddingNewAccount(false);
-      setAccountNumber(val);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // 1. Validation/Ajout de l'église
     let finalChurchName = selectedChurch;
     if (isAddingNewChurch) {
       const trimmed = newChurchInput.trim();
@@ -167,21 +131,16 @@ export default function Home() {
       return;
     }
 
-    // 2. Validation/Ajout du nouveau compte comptable
     let finalAccountCode = accountNumber;
     if (isAddingNewAccount) {
       const codeTrimmed = newAccountCode.trim();
       const labelTrimmed = newAccountLabel.trim();
-
       if (!codeTrimmed || !labelTrimmed) {
         setMessage('❌ Veuillez remplir le numéro et l\'intitulé du nouveau compte.');
         return;
       }
-
       finalAccountCode = codeTrimmed;
       const fullLabel = `${codeTrimmed} - ${labelTrimmed}`;
-
-      // Vérifier si le compte existe déjà
       const exists = accounts.some((a) => a.code === codeTrimmed && a.type === transactionType);
       if (!exists) {
         const updatedAccounts = [...accounts, { code: codeTrimmed, label: fullLabel, type: transactionType }];
@@ -192,7 +151,6 @@ export default function Home() {
 
     setMessage('Enregistrement en cours...');
 
-    // 3. Enregistrement dans Supabase
     const { error } = await supabase.from('financial_transactions').insert([
       {
         church_id: finalChurchName,
@@ -200,6 +158,7 @@ export default function Home() {
         account_number: finalAccountCode,
         amount: parseFloat(amount),
         description: description,
+        created_at: transactionDate ? new Date(transactionDate).toISOString() : new Date().toISOString(),
       },
     ]);
 
@@ -215,7 +174,6 @@ export default function Home() {
       setIsAddingNewChurch(false);
       setIsAddingNewAccount(false);
       setSelectedChurch(finalChurchName);
-      setAccountNumber(finalAccountCode);
     }
   };
 
@@ -234,6 +192,18 @@ export default function Home() {
       )}
 
       <form onSubmit={handleSubmit}>
+        {/* DATE DE LA TRANSACTION */}
+        <div style={{ marginBottom: '15px' }}>
+          <label><b>Date de l'opération :</b></label>
+          <input
+            type="date"
+            value={transactionDate}
+            onChange={(e) => setTransactionDate(e.target.value)}
+            style={{ width: '100%', padding: '10px', marginTop: '5px', boxSizing: 'border-box' }}
+            required
+          />
+        </div>
+
         {/* ÉGLISE */}
         <div style={{ marginBottom: '15px' }}>
           <label><b>Église / Paroisse :</b></label>
@@ -277,34 +247,31 @@ export default function Home() {
           </select>
         </div>
 
-        {/* SELECTION / AJOUT DE COMPTE */}
+        {/* SELECTION DE COMPTE */}
         <div style={{ marginBottom: '15px' }}>
-          <label><b>Compte comptable ({transactionType === 'INCOME' ? 'Recette' : 'Dépense'}) :</b></label>
+          <label><b>Compte comptable :</b></label>
           <select 
             value={isAddingNewAccount ? 'ADD_NEW_ACCOUNT' : accountNumber} 
-            onChange={handleAccountSelectChange} 
+            onChange={(e) => {
+              if (e.target.value === 'ADD_NEW_ACCOUNT') setIsAddingNewAccount(true);
+              else { setIsAddingNewAccount(false); setAccountNumber(e.target.value); }
+            }} 
             style={{ width: '100%', padding: '10px', marginTop: '5px' }}
             required
           >
             {filteredAccounts.map((acc) => (
-              <option key={acc.code} value={acc.code}>
-                {acc.label}
-              </option>
+              <option key={acc.code} value={acc.code}>{acc.label}</option>
             ))}
             <option value="ADD_NEW_ACCOUNT" style={{ fontWeight: 'bold', color: '#0070f3' }}>
               ➕ Ajouter une nouvelle ligne (compte)...
             </option>
           </select>
 
-          {/* Saisie d'une nouvelle ligne / compte comptable */}
           {isAddingNewAccount && (
             <div style={{ marginTop: '10px', padding: '10px', backgroundColor: '#f0f7ff', border: '1px solid #0070f3', borderRadius: '5px' }}>
-              <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 'bold', color: '#0070f3' }}>
-                Créer une nouvelle ligne en {transactionType === 'INCOME' ? 'Recette' : 'Dépense'} :
-              </p>
               <input
                 type="text"
-                placeholder="N° Compte (Ex: 114 ou 8)"
+                placeholder="N° Compte (Ex: 114)"
                 value={newAccountCode}
                 onChange={(e) => setNewAccountCode(e.target.value)}
                 style={{ width: '100%', padding: '8px', marginBottom: '8px', boxSizing: 'border-box' }}
@@ -312,7 +279,7 @@ export default function Home() {
               />
               <input
                 type="text"
-                placeholder="Désignation / Intitulé (Ex: Offrande de moisson)"
+                placeholder="Intitulé du compte"
                 value={newAccountLabel}
                 onChange={(e) => setNewAccountLabel(e.target.value)}
                 style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
@@ -337,7 +304,7 @@ export default function Home() {
 
         {/* DESCRIPTION */}
         <div style={{ marginBottom: '15px' }}>
-          <label><b>Description / Remarque :</b></label>
+          <label><b>Description / Libellé :</b></label>
           <input
             type="text"
             placeholder="Ex: Dîmes du culte de dimanche"
