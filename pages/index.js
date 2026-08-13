@@ -1,664 +1,401 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 
-// LISTE INITIALE DES ÉGLISES / ASSEMBLÉES
-const INITIAL_EGLISES = [
-  'Toutes les Assemblées',
-  'E.A Nobéré',
-  'E.A Manga',
+const ROLES = [
+  { id: 'HQ_ADMIN', label: 'Administrateur HQ (Accès Total)' },
+  { id: 'HQ_COMPTABLE', label: 'Comptable Siège / Région' },
+  { id: 'SITE_TRESO', label: 'Trésorier de Site / Assemblée' }
 ];
 
-// PLAN COMPTABLE DES RECETTES (Classe 7)
-const CATEGORIES_RECETTES = [
-  { id: '701', label: 'Dîmes et Offrandes', icon: '🪙' },
-  { id: '702', label: 'Dons et Libéralités', icon: '🎁' },
-  { id: '703', label: 'Levée de fonds / Construction', icon: '🏗️' },
-  { id: '704', label: 'Vente de livres / Matériel', icon: '📚' },
-  { id: '705', label: 'Cotisations des départements', icon: '👥' },
-  { id: '706', label: 'Autres Recettes', icon: '➕' }
-];
+const INITIAL_SITES = ['E.A Nobéré', 'E.A Manga', 'Siège Régional 2'];
 
-// PLAN COMPTABLE DES DÉPENSES (Classe 6)
-const CATEGORIES_DEPENSES = [
-  { id: '601', label: 'Aide sociale / Charité', icon: '🤝' },
-  { id: '602', label: 'Factures (Eau / Électricité / Internet)', icon: '💡' },
-  { id: '603', label: 'Entretien et Réparations', icon: '🛠️' },
-  { id: '604', label: 'Soutien Pastoral et Honoraires', icon: '👔' },
-  { id: '605', label: 'Transport / Carburant / Mission', icon: '⛽' },
-  { id: '606', label: 'Fournitures de bureau / Papeterie', icon: '📝' },
-  { id: '607', label: 'Achats d\'équipements et Matériels', icon: '🔊' },
-  { id: '608', label: 'Autres Dépenses', icon: '➖' }
-];
+export default function Dashboard() {
+  const router = useRouter();
+  const [isOnline, setIsOnline] = useState(true);
 
-export default function Home() {
-  // Date du jour par défaut au format YYYY-MM-DD
-  const todayStr = new Date().toISOString().split('T')[0];
+  const [currentUser, setCurrentUser] = useState({
+    name: 'Claude Yabre',
+    role: 'HQ_ADMIN',
+    site: 'E.A Nobéré'
+  });
 
-  const [solde, setSolde] = useState(1250000);
+  const [activeTab, setActiveTab] = useState('SAISIE');
+  const [transactions, setTransactions] = useState([]);
+  const [selectedSite, setSelectedSite] = useState('E.A Nobéré');
+  const [dateOp, setDateOp] = useState(new Date().toISOString().split('T')[0]);
   const [type, setType] = useState('RECETTE');
-  
-  // Date de l'opération
-  const [dateOperation, setDateOperation] = useState(todayStr);
+  const [codeCompte, setCodeCompte] = useState('701');
+  const [libelle, setLibelle] = useState('Dîmes et Offrandes');
+  const [montant, setMontant] = useState('');
+  const [pieceJointe, setPieceJointe] = useState(null);
 
-  // Gestion de la liste des églises
-  const [eglisesList, setEglisesList] = useState(INITIAL_EGLISES);
-  const [eglise, setEglise] = useState('E.A Nobéré');
-  const [showAddEglise, setShowAddEglise] = useState(false);
-  const [newEgliseName, setNewEgliseName] = useState('');
+  const [editingId, setEditingId] = useState(null);
 
-  const [compte, setCompte] = useState('CAISSE_ESPECES');
-  const [categorieId, setCategorieId] = useState('');
-  const [montant, setMontant] = useState('0');
-  const [successMsg, setSuccessMsg] = useState('');
-
-  // Saisie pour Onglet Virement Interne
-  const [virementSource, setVirementSource] = useState('CAISSE_ESPECES');
-  const [virementCible, setVirementCible] = useState('MOBILE_MONEY');
-
-  // Historique des transactions pour l'exportation
-  const [transactions, setTransactions] = useState([
-    {
-      id: 1,
-      date: '2026-08-01',
-      mois: '2026-08',
-      eglise: 'E.A Nobéré',
-      type: 'RECETTE',
-      compteId: '701',
-      categorie: 'Dîmes et Offrandes',
-      mode: 'CAISSE_ESPECES',
-      montant: 500000
-    },
-    {
-      id: 2,
-      date: '2026-08-05',
-      mois: '2026-08',
-      eglise: 'E.A Manga',
-      type: 'DEPENSE',
-      compteId: '602',
-      categorie: 'Factures (Eau / Électricité)',
-      mode: 'MOBILE_MONEY',
-      montant: 25000
-    }
+  const [usersList, setUsersList] = useState([
+    { id: 1, name: 'Claude Yabre', role: 'HQ_ADMIN', site: 'Siège Régional 2' },
+    { id: 2, name: 'Trésorier Manga', role: 'SITE_TRESO', site: 'E.A Manga' }
   ]);
 
-  // Filtres pour l'exportation
-  const [exportEglise, setExportEglise] = useState('Toutes les Assemblées');
-  const [exportMois, setExportMois] = useState('2026-08');
-  const [activeTab, setActiveTab] = useState('SAISIE'); // 'SAISIE', 'VIREMENT', 'EXPORT'
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
 
-  // Ajouter une église
-  const handleAddEglise = () => {
-    const trimmed = newEgliseName.trim();
-    if (!trimmed) {
-      alert('Veuillez saisir le nom de l\'église.');
-      return;
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    const localTx = localStorage.getItem('compt_ea_tx');
+    if (localTx) setTransactions(JSON.parse(localTx));
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('compt_ea_tx', JSON.stringify(transactions));
+  }, [transactions]);
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => setPieceJointe(reader.result);
+      reader.readAsDataURL(file);
     }
-    if (eglisesList.includes(trimmed)) {
-      alert('Cette église existe déjà dans la liste.');
-      return;
-    }
-    setEglisesList([...eglisesList, trimmed]);
-    setEglise(trimmed);
-    setNewEgliseName('');
-    setShowAddEglise(false);
   };
 
-  const handleKeyPress = (val) => {
-    if (val === 'C') {
-      setMontant('0');
-    } else if (val === 'DEL') {
-      setMontant((prev) => (prev.length > 1 ? prev.slice(0, -1) : '0'));
-    } else {
-      setMontant((prev) => (prev === '0' ? val : prev + val));
-    }
-  };
-
-  // Enregistrer une Saisie Opération
-  const handleValidation = () => {
-    const numericMontant = parseFloat(montant);
-    if (!dateOperation) {
-      alert('Veuillez sélectionner une date.');
-      return;
-    }
-    if (!categorieId) {
-      alert('Veuillez sélectionner un compte / une catégorie.');
-      return;
-    }
-    if (numericMontant <= 0) {
+  const handleSaveEcriture = (e) => {
+    e.preventDefault();
+    if (!montant || parseFloat(montant) <= 0) {
       alert('Veuillez saisir un montant valide.');
       return;
     }
 
-    const currentCatList = type === 'RECETTE' ? CATEGORIES_RECETTES : CATEGORIES_DEPENSES;
-    const catLabel = currentCatList.find((c) => c.id === categorieId)?.label || '';
-    const currentMois = dateOperation.substring(0, 7);
-
-    const newTx = {
-      id: Date.now(),
-      date: dateOperation,
-      mois: currentMois,
-      eglise: eglise,
-      type: type,
-      compteId: categorieId,
-      categorie: catLabel,
-      mode: compte,
-      montant: numericMontant
-    };
-
-    setTransactions([newTx, ...transactions]);
-
-    if (type === 'RECETTE') {
-      setSolde((prev) => prev + numericMontant);
+    if (editingId) {
+      setTransactions(transactions.map(t => t.id === editingId ? {
+        ...t,
+        date: dateOp,
+        site: selectedSite,
+        type,
+        codeCompte,
+        libelle,
+        montant: parseFloat(montant),
+        pieceJointe
+      } : t));
+      setEditingId(null);
+      alert('Écriture corrigée avec succès !');
     } else {
-      setSolde((prev) => prev - numericMontant);
+      const newTx = {
+        id: Date.now(),
+        date: dateOp,
+        site: selectedSite,
+        type,
+        codeCompte,
+        libelle,
+        montant: parseFloat(montant),
+        pieceJointe,
+        createdOffline: !isOnline
+      };
+      setTransactions([newTx, ...transactions]);
+      alert('Écriture enregistrée !');
     }
 
-    setSuccessMsg(`Transaction de ${numericMontant.toLocaleString()} FCFA enregistrée le ${dateOperation} pour ${eglise}`);
-    setMontant('0');
-    setCategorieId('');
-    setTimeout(() => setSuccessMsg(''), 4000);
+    setMontant('');
+    setPieceJointe(null);
   };
 
-  // Enregistrer un Virement Interne
-  const handleValidationVirement = () => {
-    const numericMontant = parseFloat(montant);
-    if (!dateOperation) {
-      alert('Veuillez sélectionner une date.');
-      return;
-    }
-    if (virementSource === virementCible) {
-      alert('Le compte source et le compte cible doivent être différents.');
-      return;
-    }
-    if (numericMontant <= 0) {
-      alert('Veuillez saisir un montant valide.');
-      return;
-    }
+  const handleGenerateANouveau = () => {
+    const totalRecettes = transactions.filter(t => t.site === selectedSite && t.type === 'RECETTE').reduce((a, b) => a + b.montant, 0);
+    const totalDepenses = transactions.filter(t => t.site === selectedSite && t.type === 'DEPENSE').reduce((a, b) => a + b.montant, 0);
+    const soldeCalcul = totalRecettes - totalDepenses;
 
-    const currentMois = dateOperation.substring(0, 7);
-
-    const newTx = {
+    const autoRan = {
       id: Date.now(),
-      date: dateOperation,
-      mois: currentMois,
-      eglise: eglise,
-      type: 'VIREMENT_INTERNE',
-      compteId: '580',
-      categorie: `Virement : ${virementSource} ➡️ ${virementCible}`,
-      mode: `${virementSource} -> ${virementCible}`,
-      montant: numericMontant
+      date: `${new Date().getFullYear() + 1}-01-01`,
+      site: selectedSite,
+      type: soldeCalcul >= 0 ? 'RECETTE' : 'DEPENSE',
+      codeCompte: '891',
+      libelle: 'À-Nouveau Automatique (Bilan d\'ouverture)',
+      montant: Math.abs(soldeCalcul),
+      pieceJointe: null
     };
 
-    setTransactions([newTx, ...transactions]);
-
-    setSuccessMsg(`Virement de ${numericMontant.toLocaleString()} FCFA (${virementSource} ➡️ ${virementCible}) enregistré !`);
-    setMontant('0');
-    setTimeout(() => setSuccessMsg(''), 4000);
+    setTransactions([autoRan, ...transactions]);
+    alert(`À-nouveau généré automatiquement pour ${selectedSite} : ${soldeCalcul.toLocaleString()} FCFA`);
   };
 
-  // FONCTION D'EXPORTATION CSV (EXCEL)
-  const exportToCSV = (typeReport) => {
-    let filtered = transactions.filter((t) => {
-      const matchEglise = exportEglise === 'Toutes les Assemblées' || t.eglise === exportEglise;
-      const matchMois = !exportMois || t.mois === exportMois;
-      return matchEglise && matchMois;
-    });
-
-    if (filtered.length === 0) {
-      alert('Aucune donnée à exporter pour les filtres sélectionnés.');
-      return;
-    }
-
-    let csvContent = 'data:text/csv;charset=utf-8,\uFEFF'; // UTF-8 BOM pour Excel
-
-    if (typeReport === 'JOURNAL') {
-      csvContent += 'Date;Assemblee;Type;Compte;Libelle;Mode/Virement;Montant FCFA\n';
-      filtered.forEach((t) => {
-        csvContent += `${t.date};"${t.eglise}";${t.type};${t.compteId};"${t.categorie}";"${t.mode}";${t.montant}\n`;
-      });
-    } else if (typeReport === 'BILAN') {
-      let totalRecettes = filtered.filter(t => t.type === 'RECETTE').reduce((acc, t) => acc + t.montant, 0);
-      let totalDepenses = filtered.filter(t => t.type === 'DEPENSE').reduce((acc, t) => acc + t.montant, 0);
-      let soldeNet = totalRecettes - totalDepenses;
-
-      csvContent += `BILAN COMPTABLE - ${exportEglise} (${exportMois})\n\n`;
-      csvContent += 'Designation;Montant FCFA\n';
-      csvContent += `Total Recettes (Entrees);${totalRecettes}\n`;
-      csvContent += `Total Depenses (Sorties);${totalDepenses}\n`;
-      csvContent += `SOLDE NET (RESULTAT);${soldeNet}\n`;
-    }
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `${typeReport}_${exportEglise.replace(/\s+/g, '_')}_${exportMois}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleEdit = (tx) => {
+    setEditingId(tx.id);
+    setDateOp(tx.date);
+    setSelectedSite(tx.site);
+    setType(tx.type);
+    setCodeCompte(tx.codeCompte);
+    setLibelle(tx.libelle);
+    setMontant(tx.montant.toString());
+    setPieceJointe(tx.pieceJointe);
+    setActiveTab('SAISIE');
   };
 
-  const categories = type === 'RECETTE' ? CATEGORIES_RECETTES : CATEGORIES_DEPENSES;
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    router.push('/login');
+  };
 
   return (
-    <div style={{ maxWidth: '480px', margin: '0 auto', padding: '16px', fontFamily: 'sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
+    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '16px', fontFamily: 'sans-serif', backgroundColor: '#f8fafc', minHeight: '100vh' }}>
       
-      {/* Logo */}
-      <div style={{ textAlign: 'center', marginBottom: '12px' }}>
-        <img 
-          src="/logo.png" 
-          alt="Logo Église" 
-          style={{ height: '60px', width: 'auto', objectFit: 'contain' }} 
-        />
-      </div>
-
-      {/* Carte Solde & Entête */}
-      <div style={{ backgroundColor: '#0f172a', color: 'white', borderRadius: '16px', padding: '16px', marginBottom: '16px' }}>
-        <div style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 'bold' }}>
-          Comptabilité EA Région 2 • Solde Actuel
+      {/* BARRE SUPÉRIEURE */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#0f172a', color: 'white', padding: '12px 16px', borderRadius: '12px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: '36px', height: '36px', borderRadius: '50%', border: '2px solid #0284c7', backgroundColor: 'white', padding: '2px' }}>
+            <img src="/logo.png" alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 'bold', fontSize: '15px' }}>COMPT-EA</div>
+            <div style={{ fontSize: '10px', color: '#94a3b8' }}>{currentUser.name} ({currentUser.role})</div>
+          </div>
         </div>
-        <div style={{ fontSize: '26px', fontWeight: 'bold', marginTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>{solde.toLocaleString()} FCFA</span>
-          <span>💼</span>
-        </div>
-      </div>
 
-      {/* TABS : SAISIE / VIREMENTS / EXPORTATION */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '16px' }}>
-        <button
-          type="button"
-          onClick={() => setActiveTab('SAISIE')}
-          style={{
-            padding: '10px 4px',
-            borderRadius: '10px',
-            fontWeight: 'bold',
-            fontSize: '11px',
-            border: 'none',
-            cursor: 'pointer',
-            backgroundColor: activeTab === 'SAISIE' ? '#0284c7' : '#e2e8f0',
-            color: activeTab === 'SAISIE' ? 'white' : '#475569'
-          }}
-        >
-          📝 Saisie
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('VIREMENT')}
-          style={{
-            padding: '10px 4px',
-            borderRadius: '10px',
-            fontWeight: 'bold',
-            fontSize: '11px',
-            border: 'none',
-            cursor: 'pointer',
-            backgroundColor: activeTab === 'VIREMENT' ? '#0284c7' : '#e2e8f0',
-            color: activeTab === 'VIREMENT' ? 'white' : '#475569'
-          }}
-        >
-          🔁 Virements
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('EXPORT')}
-          style={{
-            padding: '10px 4px',
-            borderRadius: '10px',
-            fontWeight: 'bold',
-            fontSize: '11px',
-            border: 'none',
-            cursor: 'pointer',
-            backgroundColor: activeTab === 'EXPORT' ? '#0284c7' : '#e2e8f0',
-            color: activeTab === 'EXPORT' ? 'white' : '#475569'
-          }}
-        >
-          📊 Exports
-        </button>
-      </div>
-
-      {/* Message de succès global */}
-      {successMsg && (
-        <div style={{ backgroundColor: '#d1fae5', border: '1px solid #34d399', color: '#065f46', padding: '12px', borderRadius: '12px', marginBottom: '16px', fontSize: '13px', fontWeight: 'bold', textAlign: 'center' }}>
-          ✅ {successMsg}
-        </div>
-      )}
-
-      {/* ONGLET 1 : SAISIE TRANSACTION */}
-      {activeTab === 'SAISIE' && (
-        <>
-          {/* SELECTION DE LA DATE */}
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
-              Date de l&apos;opération
-            </label>
-            <input
-              type="date"
-              value={dateOperation}
-              onChange={(e) => setDateOperation(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', backgroundColor: 'white', fontSize: '14px', fontWeight: '600', color: '#1e293b', outline: 'none', boxSizing: 'border-box' }}
-            />
-          </div>
-
-          {/* SELECTION / AJOUT DE L'EGLISE */}
-          <div style={{ marginBottom: '14px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>
-                Sélectionner l&apos;Église / Assemblée
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowAddEglise(!showAddEglise)}
-                style={{
-                  backgroundColor: '#e0f2fe',
-                  color: '#0369a1',
-                  border: 'none',
-                  padding: '4px 8px',
-                  borderRadius: '6px',
-                  fontSize: '11px',
-                  fontWeight: 'bold',
-                  cursor: 'pointer'
-                }}
-              >
-                {showAddEglise ? 'Fermer' : '➕ Ajouter église'}
-              </button>
-            </div>
-
-            {showAddEglise && (
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', backgroundColor: '#f1f5f9', padding: '8px', borderRadius: '10px' }}>
-                <input
-                  type="text"
-                  placeholder="Ex: E.A Zourma"
-                  value={newEgliseName}
-                  onChange={(e) => setNewEgliseName(e.target.value)}
-                  style={{ flex: 1, padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', outline: 'none' }}
-                />
-                <button
-                  type="button"
-                  onClick={handleAddEglise}
-                  style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '8px', fontWeight: 'bold', fontSize: '12px', cursor: 'pointer' }}
-                >
-                  Ajouter
-                </button>
-              </div>
-            )}
-
-            <select
-              value={eglise}
-              onChange={(e) => setEglise(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', backgroundColor: 'white', fontSize: '14px', fontWeight: '600', color: '#1e293b', outline: 'none' }}
-            >
-              {eglisesList.filter(item => item !== 'Toutes les Assemblées').map((item) => (
-                <option key={item} value={item}>
-                  ⛪ {item}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* TYPE : ENTREE OU SORTIE */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px', backgroundColor: '#e2e8f0', padding: '4px', borderRadius: '12px' }}>
-            <button
-              type="button"
-              onClick={() => { setType('RECETTE'); setCategorieId(''); }}
-              style={{ padding: '10px', borderRadius: '8px', fontWeight: 'bold', border: 'none', cursor: 'pointer', backgroundColor: type === 'RECETTE' ? '#059669' : 'transparent', color: type === 'RECETTE' ? 'white' : '#475569' }}
-            >
-              ⬇️ Entrée (Recette)
-            </button>
-            <button
-              type="button"
-              onClick={() => { setType('DEPENSE'); setCategorieId(''); }}
-              style={{ padding: '10px', borderRadius: '8px', fontWeight: 'bold', border: 'none', cursor: 'pointer', backgroundColor: type === 'DEPENSE' ? '#e11d48' : 'transparent', color: type === 'DEPENSE' ? 'white' : '#475569' }}
-            >
-              ⬆️ Sortie (Dépense)
-            </button>
-          </div>
-
-          {/* MODE DE REGLEMENT */}
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
-              Mode de règlement / Compte
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-              {[
-                { id: 'CAISSE_ESPECES', label: '💵 Espèces' },
-                { id: 'MOBILE_MONEY', label: '📱 Mobile' },
-                { id: 'BANQUE', label: '🏦 Banque' }
-              ].map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => setCompte(m.id)}
-                  style={{ padding: '8px 4px', fontSize: '11px', fontWeight: 'bold', borderRadius: '8px', border: '1px solid #cbd5e1', cursor: 'pointer', backgroundColor: compte === m.id ? '#1e293b' : 'white', color: compte === m.id ? 'white' : '#334155' }}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* PLAN COMPTABLE / CATEGORIES */}
-          <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
-              Plan comptable - {type === 'RECETTE' ? 'Recettes (Classe 7)' : 'Dépenses (Classe 6)'}
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-              {categories.map((cat) => (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setCategorieId(cat.id)}
-                  style={{ padding: '10px', borderRadius: '12px', border: categorieId === cat.id ? `2px solid ${type === 'RECETTE' ? '#059669' : '#e11d48'}` : '1px solid #e2e8f0', backgroundColor: categorieId === cat.id ? (type === 'RECETTE' ? '#ecfdf5' : '#fff1f2') : 'white', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}
-                >
-                  <span style={{ fontSize: '18px' }}>{cat.icon}</span>
-                  <div>
-                    <div style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 'bold' }}>Compte {cat.id}</div>
-                    <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#334155' }}>{cat.label}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* MONTANT ET PAVÉ NUMÉRIQUE */}
-          <div style={{ backgroundColor: 'white', border: '2px solid #cbd5e1', borderRadius: '16px', padding: '10px 14px', marginBottom: '12px', textAlign: 'right' }}>
-            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase' }}>Montant à saisir</div>
-            <div style={{ fontSize: '26px', fontWeight: '900', color: '#0f172a' }}>
-              {parseInt(montant, 10).toLocaleString()} <span style={{ fontSize: '15px', fontWeight: 'normal', color: '#64748b' }}>FCFA</span>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '14px' }}>
-            {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'DEL'].map((btn) => (
-              <button
-                key={btn}
-                type="button"
-                onClick={() => handleKeyPress(btn)}
-                style={{ padding: '12px', borderRadius: '12px', fontWeight: 'bold', fontSize: '18px', border: '1px solid #e2e8f0', cursor: 'pointer', backgroundColor: btn === 'C' ? '#ffe4e6' : btn === 'DEL' ? '#fef3c7' : 'white', color: btn === 'C' ? '#be123c' : btn === 'DEL' ? '#b45309' : '#1e293b' }}
-              >
-                {btn === 'DEL' ? '⌫' : btn}
-              </button>
-            ))}
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '11px', fontWeight: 'bold', padding: '4px 8px', borderRadius: '20px', backgroundColor: isOnline ? '#166534' : '#991b1b', color: 'white' }}>
+            {isOnline ? '🟢 En ligne' : '🔴 Mode Hors-Réseau'}
+          </span>
 
           <button
-            type="button"
-            onClick={handleValidation}
-            style={{ width: '100%', padding: '14px', borderRadius: '12px', color: 'white', fontWeight: 'bold', fontSize: '16px', border: 'none', cursor: 'pointer', backgroundColor: type === 'RECETTE' ? '#059669' : '#e11d48' }}
+            onClick={handleLogout}
+            style={{ backgroundColor: '#be123c', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
           >
-            Enregistrer la transaction
+            🚪 Déconnexion
           </button>
-        </>
+        </div>
+      </div>
+
+      {/* NAVIGATION */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '8px', marginBottom: '16px' }}>
+        {[
+          { id: 'SAISIE', label: '📝 Saisie' },
+          { id: 'JOURNAL', label: '📖 Journal Direct' },
+          { id: 'ANOUVEAU', label: '🔄 À-Nouveau' },
+          { id: 'USERS', label: '👥 Utilisateurs & HQ' }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              padding: '12px',
+              borderRadius: '8px',
+              fontWeight: 'bold',
+              border: 'none',
+              cursor: 'pointer',
+              backgroundColor: activeTab === tab.id ? '#0284c7' : '#e2e8f0',
+              color: activeTab === tab.id ? 'white' : '#334155',
+              fontSize: '13px'
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* SAISIE */}
+      {activeTab === 'SAISIE' && (
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
+          <h3 style={{ margin: '0 0 16px 0', color: '#0f172a' }}>
+            {editingId ? '✏️ Correction d\'une Écriture' : '📝 Enregistrement d\'une Pièce Comptable'}
+          </h3>
+
+          <form onSubmit={handleSaveEcriture} style={{ display: 'grid', gap: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#475569' }}>DATE</label>
+                <input
+                  type="date"
+                  value={dateOp}
+                  onChange={(e) => setDateOp(e.target.value)}
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#475569' }}>SITE / ASSEMBLÉE</label>
+                <select
+                  value={selectedSite}
+                  onChange={(e) => setSelectedSite(e.target.value)}
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                >
+                  {INITIAL_SITES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#475569' }}>TYPE D'OPÉRATION</label>
+                <select
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                >
+                  <option value="RECETTE">Recette (Entrée)</option>
+                  <option value="DEPENSE">Dépense (Sortie)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#475569' }}>MONTANT FCFA</label>
+                <input
+                  type="number"
+                  placeholder="Ex: 50000"
+                  value={montant}
+                  onChange={(e) => setMontant(e.target.value)}
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#475569' }}>LIBELLÉ / DESCRIPTION</label>
+              <input
+                type="text"
+                value={libelle}
+                onChange={(e) => setLibelle(e.target.value)}
+                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            {/* ATTACHER UN FICHIER OU CAPTURE PHOTO */}
+            <div style={{ border: '2px dashed #cbd5e1', padding: '16px', borderRadius: '8px', textAlign: 'center' }}>
+              <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#0284c7', cursor: 'pointer', display: 'block' }}>
+                📷 Prendre une photo du reçu ou Télécharger la pièce jointe
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  capture="environment"
+                  onChange={handleFileUpload}
+                  style={{ display: 'none' }}
+                />
+              </label>
+              {pieceJointe && (
+                <div style={{ marginTop: '8px', color: '#15803d', fontSize: '12px', fontWeight: 'bold' }}>
+                  ✅ Pièce comptable attachée !
+                </div>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              style={{
+                padding: '14px',
+                borderRadius: '8px',
+                backgroundColor: editingId ? '#d97706' : '#059669',
+                color: 'white',
+                fontWeight: 'bold',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              {editingId ? 'Valider la Correction' : 'Enregistrer l\'Écriture'}
+            </button>
+          </form>
+        </div>
       )}
 
-      {/* ONGLET 2 : VIREMENTS INTERNES */}
-      {activeTab === 'VIREMENT' && (
-        <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
-          <h3 style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#0f172a' }}>🔁 Virement Interne de Trésorerie</h3>
-          <p style={{ fontSize: '12px', color: '#64748b', marginTop: 0, marginBottom: '14px' }}>
-            Transférez des fonds entre Caisse Espèces, Mobile Money et Banque sans modifier le résultat net.
+      {/* JOURNAL DIRECT */}
+      {activeTab === 'JOURNAL' && (
+        <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
+          <h3 style={{ margin: '0 0 12px 0', color: '#0f172a' }}>📖 Journal des Écritures ({transactions.length})</h3>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
+                  <th style={{ padding: '8px' }}>Date</th>
+                  <th style={{ padding: '8px' }}>Site</th>
+                  <th style={{ padding: '8px' }}>Libellé</th>
+                  <th style={{ padding: '8px' }}>Montant</th>
+                  <th style={{ padding: '8px' }}>Preuve</th>
+                  <th style={{ padding: '8px' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.map((t) => (
+                  <tr key={t.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <td style={{ padding: '8px' }}>{t.date}</td>
+                    <td style={{ padding: '8px' }}>{t.site}</td>
+                    <td style={{ padding: '8px' }}>{t.libelle}</td>
+                    <td style={{ padding: '8px', fontWeight: 'bold', color: t.type === 'RECETTE' ? '#059669' : '#e11d48' }}>
+                      {t.type === 'RECETTE' ? '+' : '-'}{t.montant.toLocaleString()} F
+                    </td>
+                    <td style={{ padding: '8px' }}>
+                      {t.pieceJointe ? '📄 Oui' : 'Non'}
+                    </td>
+                    <td style={{ padding: '8px' }}>
+                      <button
+                        onClick={() => handleEdit(t)}
+                        style={{ backgroundColor: '#f59e0b', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}
+                      >
+                        ✏️ Corriger
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* À-NOUVEAU */}
+      {activeTab === 'ANOUVEAU' && (
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
+          <h3 style={{ margin: '0 0 12px 0', color: '#0f172a' }}>🔄 Gestion des À-Nouveau (Reports à Nouveau)</h3>
+          <p style={{ fontSize: '13px', color: '#64748b' }}>
+            Générez ou saisissez le solde de départ au 1er janvier pour chaque assemblée.
           </p>
 
-          {/* Date du virement */}
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', display: 'block', marginBottom: '4px' }}>
-              Date du Virement :
-            </label>
-            <input
-              type="date"
-              value={dateOperation}
-              onChange={(e) => setDateOperation(e.target.value)}
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600', boxSizing: 'border-box' }}
-            />
-          </div>
-
-          {/* Assemblée concernée */}
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', display: 'block', marginBottom: '4px' }}>
-              Assemblée concernée :
-            </label>
-            <select
-              value={eglise}
-              onChange={(e) => setEglise(e.target.value)}
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600' }}
-            >
-              {eglisesList.filter(item => item !== 'Toutes les Assemblées').map((item) => (
-                <option key={item} value={item}>
-                  ⛪ {item}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Compte Source */}
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', display: 'block', marginBottom: '4px' }}>
-              1. Depuis le compte (SOURCE) :
-            </label>
-            <select
-              value={virementSource}
-              onChange={(e) => setVirementSource(e.target.value)}
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600' }}
-            >
-              <option value="CAISSE_ESPECES">💵 Caisse Espèces</option>
-              <option value="MOBILE_MONEY">📱 Mobile Money</option>
-              <option value="BANQUE">BANQUE</option>
-            </select>
-          </div>
-
-          {/* Compte Cible */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', display: 'block', marginBottom: '4px' }}>
-              2. Vers le compte (DESTINATION) :
-            </label>
-            <select
-              value={virementCible}
-              onChange={(e) => setVirementCible(e.target.value)}
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600' }}
-            >
-              <option value="CAISSE_ESPECES">💵 Caisse Espèces</option>
-              <option value="MOBILE_MONEY">📱 Mobile Money</option>
-              <option value="BANQUE">🏦 Banque</option>
-            </select>
-          </div>
-
-          {/* Montant Virement */}
-          <div style={{ backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '10px 14px', marginBottom: '12px', textAlign: 'right' }}>
-            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase' }}>Montant du Virement</div>
-            <div style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a' }}>
-              {parseInt(montant, 10).toLocaleString()} <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#64748b' }}>FCFA</span>
+          <div style={{ display: 'grid', gap: '16px', marginTop: '16px' }}>
+            <div style={{ padding: '16px', backgroundColor: '#f0f9ff', borderRadius: '8px', border: '1px solid #0284c7' }}>
+              <h4 style={{ margin: '0 0 8px 0', color: '#0369a1' }}>Génération Automatique</h4>
+              <p style={{ fontSize: '12px', color: '#334155', margin: '0 0 12px 0' }}>
+                Calcule automatiquement le solde final pour l'assemblée **{selectedSite}** et crée l'écriture d'À-nouveau.
+              </p>
+              <button
+                onClick={handleGenerateANouveau}
+                style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '10px 16px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                ⚙️ Générer l'À-Nouveau Automatique
+              </button>
             </div>
           </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '14px' }}>
-            {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'DEL'].map((btn) => (
-              <button
-                key={btn}
-                type="button"
-                onClick={() => handleKeyPress(btn)}
-                style={{ padding: '10px', borderRadius: '10px', fontWeight: 'bold', fontSize: '16px', border: '1px solid #e2e8f0', cursor: 'pointer', backgroundColor: btn === 'C' ? '#ffe4e6' : btn === 'DEL' ? '#fef3c7' : 'white', color: btn === 'C' ? '#be123c' : btn === 'DEL' ? '#b45309' : '#1e293b' }}
-              >
-                {btn === 'DEL' ? '⌫' : btn}
-              </button>
-            ))}
-          </div>
-
-          <button
-            type="button"
-            onClick={handleValidationVirement}
-            style={{ width: '100%', padding: '14px', borderRadius: '10px', backgroundColor: '#0284c7', color: 'white', fontWeight: 'bold', border: 'none', cursor: 'pointer', fontSize: '15px' }}
-          >
-            Valider le Virement Interne
-          </button>
         </div>
       )}
 
-      {/* ONGLET 3 : EXPORTATION JOURNAL ET BILAN */}
-      {activeTab === 'EXPORT' && (
-        <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
-          <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#0f172a' }}>📥 Filtres d&apos;exportation</h3>
+      {/* UTILISATEURS */}
+      {activeTab === 'USERS' && (
+        <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
+          <h3 style={{ margin: '0 0 16px 0', color: '#0f172a' }}>👥 Management des Utilisateurs et Rôles HQ</h3>
 
-          {/* Filtre Assemblée */}
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', display: 'block', marginBottom: '4px' }}>
-              Filtrer par Assemblée :
-            </label>
-            <select
-              value={exportEglise}
-              onChange={(e) => setExportEglise(e.target.value)}
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600' }}
-            >
-              {eglisesList.map((item) => (
-                <option key={item} value={item}>
-                  ⛪ {item}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Filtre Mois */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', display: 'block', marginBottom: '4px' }}>
-              Filtrer par Mois :
-            </label>
-            <input
-              type="month"
-              value={exportMois}
-              onChange={(e) => setExportMois(e.target.value)}
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600', boxSizing: 'border-box' }}
-            />
-          </div>
-
-          {/* Boutons d'exportation */}
-          <div style={{ display: 'grid', gap: '10px', marginBottom: '20px' }}>
-            <button
-              type="button"
-              onClick={() => exportToCSV('JOURNAL')}
-              style={{ width: '100%', padding: '14px', borderRadius: '10px', backgroundColor: '#059669', color: 'white', fontWeight: 'bold', border: 'none', cursor: 'pointer', fontSize: '14px' }}
-            >
-              📄 Exporter le Journal Mensuel (.CSV / Excel)
-            </button>
-            <button
-              type="button"
-              onClick={() => exportToCSV('BILAN')}
-              style={{ width: '100%', padding: '14px', borderRadius: '10px', backgroundColor: '#0284c7', color: 'white', fontWeight: 'bold', border: 'none', cursor: 'pointer', fontSize: '14px' }}
-            >
-              📊 Exporter le Bilan Comptable (.CSV / Excel)
-            </button>
-          </div>
-
-          {/* Aperçu des dernières transactions enregistrées */}
-          <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#64748b', textTransform: 'uppercase' }}>
-            Aperçu des opérations ({transactions.length})
-          </h4>
-          <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-            {transactions.map((t) => (
-              <div key={t.id} style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-                <div>
-                  <div style={{ fontWeight: 'bold', color: '#1e293b' }}>{t.eglise} • {t.categorie}</div>
-                  <div style={{ color: '#94a3b8', fontSize: '10px' }}>{t.date} • Compte {t.compteId} ({t.mode})</div>
-                </div>
-                <div style={{ fontWeight: 'bold', color: t.type === 'RECETTE' ? '#059669' : t.type === 'DEPENSE' ? '#e11d48' : '#0284c7' }}>
-                  {t.type === 'RECETTE' ? '+' : t.type === 'DEPENSE' ? '-' : '🔁 '}{t.montant.toLocaleString()} F
-                </div>
-              </div>
-            ))}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1', textAlign: 'left' }}>
+                  <th style={{ padding: '8px' }}>Nom</th>
+                  <th style={{ padding: '8px' }}>Rôle</th>
+                  <th style={{ padding: '8px' }}>Site / Assemblée</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usersList.map((u) => (
+                  <tr key={u.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <td style={{ padding: '8px', fontWeight: 'bold' }}>{u.name}</td>
+                    <td style={{ padding: '8px' }}>{u.role}</td>
+                    <td style={{ padding: '8px' }}>{u.site}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
