@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { supabase } from '../lib/supabase'; // Assurez-vous du chemin exact vers votre client Supabase
 
 const PLAN_COMPTABLE = {
   DEPENSE: [
@@ -52,19 +53,19 @@ export default function Dashboard() {
   const [currentUser, setCurrentUser] = useState(null);
 
   // Données configurables
-  const [sites, setSites] = useState(['E.A Nobéré', 'E.A Manga', 'Siège Régional 2']);
+  const [sites, setSites] = useState([]);
   const [newSiteName, setNewSiteName] = useState('');
 
   const [usersList, setUsersList] = useState([]);
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState('SITE_TRESO');
-  const [newUserSite, setNewUserSite] = useState('E.A Nobéré');
+  const [newUserSite, setNewUserSite] = useState('');
 
   const [activeTab, setActiveTab] = useState('SAISIE');
   const [transactions, setTransactions] = useState([]);
 
   // Formulaire Saisie
-  const [selectedSite, setSelectedSite] = useState('E.A Nobéré');
+  const [selectedSite, setSelectedSite] = useState('');
   const [dateOp, setDateOp] = useState(new Date().toISOString().split('T')[0]);
   const [type, setType] = useState('RECETTE');
   const [codeCompte, setCodeCompte] = useState('1');
@@ -79,7 +80,7 @@ export default function Dashboard() {
   const [virementCible, setVirementCible] = useState('Mobile Money');
   const [virementMontant, setVirementMontant] = useState('');
 
-  // CHARGEMENT INITIAL
+  // CHARGEMENT INITIAL CENTRALISÉ DEPUIS SUPABASE
   useEffect(() => {
     setIsOnline(navigator.onLine);
     const handleOnline = () => setIsOnline(true);
@@ -88,26 +89,19 @@ export default function Dashboard() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // 1. Vérifier la connexion de l'utilisateur
-    const savedUser = localStorage.getItem('user');
+    // 1. Vérifier la session utilisateur
+    const savedUser = localStorage.getItem('user'); // Conservé pour garder la session active
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser);
       setCurrentUser(parsedUser);
-      setSelectedSite(parsedUser.site || 'E.A Nobéré');
+      setSelectedSite(parsedUser.site || '');
     } else {
       router.push('/login');
       return;
     }
 
-    // 2. Charger les données du localStorage
-    const localTx = localStorage.getItem('compt_ea_tx');
-    if (localTx) setTransactions(JSON.parse(localTx));
-
-    const localSites = localStorage.getItem('compt_ea_sites');
-    if (localSites) setSites(JSON.parse(localSites));
-
-    const localUsers = localStorage.getItem('compt_ea_users');
-    if (localUsers) setUsersList(JSON.parse(localUsers));
+    // 2. Charger toutes les données depuis Supabase
+    loadCentralData();
 
     return () => {
       window.removeEventListener('online', handleOnline);
@@ -115,24 +109,28 @@ export default function Dashboard() {
     };
   }, []);
 
-  // SAUVEGARDES AUTOMATIQUES
-  useEffect(() => {
-    if (transactions.length > 0) {
-      localStorage.setItem('compt_ea_tx', JSON.stringify(transactions));
+  const loadCentralData = async () => {
+    // A. Charger les Assemblées/Sites
+    const { data: dbSites } = await supabase.from('sites').select('*');
+    if (dbSites && dbSites.length > 0) {
+      const siteNames = dbSites.map(s => s.name || s.nom);
+      setSites(siteNames);
+      if (!selectedSite) setSelectedSite(siteNames[0]);
+      setNewUserSite(siteNames[0]);
     }
-  }, [transactions]);
 
-  useEffect(() => {
-    if (sites.length > 0) {
-      localStorage.setItem('compt_ea_sites', JSON.stringify(sites));
+    // B. Charger les Transactions / Opérations
+    const { data: dbTx } = await supabase.from('operations').select('*').order('id', { ascending: false });
+    if (dbTx) {
+      setTransactions(dbTx);
     }
-  }, [sites]);
 
-  useEffect(() => {
-    if (usersList.length > 0) {
-      localStorage.setItem('compt_ea_users', JSON.stringify(usersList));
+    // C. Charger les Utilisateurs
+    const { data: dbUsers } = await supabase.from('profiles').select('*');
+    if (dbUsers) {
+      setUsersList(dbUsers);
     }
-  }, [usersList]);
+  };
 
   // DECONNEXION PROPRE
   const handleLogout = () => {
@@ -154,42 +152,51 @@ export default function Dashboard() {
     }
   };
 
-  const handleSaveEcriture = (e) => {
+  // 1. SAUVEGARDER / CORRIGER UNE ÉCRITURE SUR SUPABASE
+  const handleSaveEcriture = async (e) => {
     e.preventDefault();
     if (!montant || parseFloat(montant) <= 0) {
       alert('Veuillez saisir un montant valide.');
       return;
     }
 
+    const payload = {
+      date: dateOp,
+      site: selectedSite,
+      type,
+      codeCompte,
+      modePaiement,
+      libelle: libelle || PLAN_COMPTABLE[type].find(c => c.code === codeCompte)?.label,
+      montant: parseFloat(montant),
+      pieceJointe
+    };
+
     if (editingId) {
-      setTransactions(transactions.map(t => t.id === editingId ? {
-        ...t,
-        date: dateOp,
-        site: selectedSite,
-        type,
-        codeCompte,
-        modePaiement,
-        libelle,
-        montant: parseFloat(montant),
-        pieceJointe
-      } : t));
-      setEditingId(null);
-      alert('Écriture corrigée avec succès !');
+      // Modification dans Supabase
+      const { error } = await supabase
+        .from('operations')
+        .update(payload)
+        .eq('id', editingId);
+
+      if (error) {
+        alert("Erreur de mise à jour sur le serveur : " + error.message);
+      } else {
+        alert('Écriture corrigée avec succès sur la base centralisée !');
+        setEditingId(null);
+        loadCentralData();
+      }
     } else {
-      const newTx = {
-        id: Date.now(),
-        date: dateOp,
-        site: selectedSite,
-        type,
-        codeCompte,
-        modePaiement,
-        libelle: libelle || PLAN_COMPTABLE[type].find(c => c.code === codeCompte)?.label,
-        montant: parseFloat(montant),
-        pieceJointe,
-        createdOffline: !isOnline
-      };
-      setTransactions([newTx, ...transactions]);
-      alert('Écriture enregistrée !');
+      // Insertion dans Supabase
+      const { error } = await supabase
+        .from('operations')
+        .insert([payload]);
+
+      if (error) {
+        alert("Erreur d'enregistrement sur le serveur : " + error.message);
+      } else {
+        alert('Écriture enregistrée sur la base centralisée !');
+        loadCentralData();
+      }
     }
 
     setMontant('');
@@ -197,7 +204,8 @@ export default function Dashboard() {
     setPieceJointe(null);
   };
 
-  const handleVirement = (e) => {
+  // 2. EFECTUER UN VIREMENT INTERNE SUR SUPABASE
+  const handleVirement = async (e) => {
     e.preventDefault();
     if (virementSource === virementCible) {
       alert('Le mode de provenance et de destination doivent être différents.');
@@ -209,8 +217,8 @@ export default function Dashboard() {
     }
 
     const val = parseFloat(virementMontant);
+
     const txOut = {
-      id: Date.now(),
       date: dateOp,
       site: selectedSite,
       type: 'DEPENSE',
@@ -222,7 +230,6 @@ export default function Dashboard() {
     };
 
     const txIn = {
-      id: Date.now() + 1,
       date: dateOp,
       site: selectedSite,
       type: 'RECETTE',
@@ -233,27 +240,50 @@ export default function Dashboard() {
       pieceJointe: null
     };
 
-    setTransactions([txIn, txOut, ...transactions]);
-    setVirementMontant('');
-    alert('Virement interne effectué avec succès !');
-  };
+    const { error } = await supabase.from('operations').insert([txOut, txIn]);
 
-  const handleAddSite = (e) => {
-    e.preventDefault();
-    if (newSiteName && !sites.includes(newSiteName)) {
-      setSites([...sites, newSiteName]);
-      setNewSiteName('');
-      alert('Nouvelle assemblée ajoutée !');
+    if (error) {
+      alert("Erreur lors du virement sur le serveur : " + error.message);
+    } else {
+      alert('Virement interne effectué et centralisé avec succès !');
+      setVirementMontant('');
+      loadCentralData();
     }
   };
 
-  const handleAddUser = (e) => {
+  // 3. AJOUTER UNE ASSEMBLÉE SUR SUPABASE
+  const handleAddSite = async (e) => {
+    e.preventDefault();
+    if (newSiteName && !sites.includes(newSiteName)) {
+      const { error } = await supabase.from('sites').insert([{ name: newSiteName }]);
+
+      if (error) {
+        alert("Erreur lors de l'ajout du site sur Supabase : " + error.message);
+      } else {
+        alert('Nouvelle assemblée centralisée !');
+        setNewSiteName('');
+        loadCentralData();
+      }
+    }
+  };
+
+  // 4. CREER UN UTILISATEUR SUR SUPABASE
+  const handleAddUser = async (e) => {
     e.preventDefault();
     if (newUserName) {
-      const updatedUsers = [...usersList, { id: Date.now(), name: newUserName, role: newUserRole, site: newUserSite }];
-      setUsersList(updatedUsers);
-      setNewUserName('');
-      alert('Utilisateur ajouté avec succès !');
+      const { error } = await supabase.from('profiles').insert([{
+        name: newUserName,
+        role: newUserRole,
+        site: newUserSite
+      }]);
+
+      if (error) {
+        alert("Erreur lors de la création de l'utilisateur sur le serveur : " + error.message);
+      } else {
+        alert('Utilisateur ajouté à la base centralisée !');
+        setNewUserName('');
+        loadCentralData();
+      }
     }
   };
 
