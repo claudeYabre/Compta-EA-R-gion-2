@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 
-// PLAN COMPTABLE EXTRACT DE L'IMAGE
+// PLAN COMPTABLE EXTRAIT DE L'IMAGE
 const PLAN_COMPTABLE = {
   DEPENSE: [
     { code: '101', label: '101 - Dimes des dimes' },
@@ -86,6 +86,7 @@ export default function Dashboard() {
   const [virementCible, setVirementCible] = useState('Mobile Money');
   const [virementMontant, setVirementMontant] = useState('');
 
+  // CHARGEMENT INITIAL (Local Storage)
   useEffect(() => {
     setIsOnline(navigator.onLine);
     const handleOnline = () => setIsOnline(true);
@@ -100,12 +101,17 @@ export default function Dashboard() {
     const localSites = localStorage.getItem('compt_ea_sites');
     if (localSites) setSites(JSON.parse(localSites));
 
+    // CHARGEMENT DES UTILISATEURS
+    const localUsers = localStorage.getItem('compt_ea_users');
+    if (localUsers) setUsersList(JSON.parse(localUsers));
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
+  // SAUVEGARDE AUTOMATIQUE
   useEffect(() => {
     localStorage.setItem('compt_ea_tx', JSON.stringify(transactions));
   }, [transactions]);
@@ -113,6 +119,10 @@ export default function Dashboard() {
   useEffect(() => {
     localStorage.setItem('compt_ea_sites', JSON.stringify(sites));
   }, [sites]);
+
+  useEffect(() => {
+    localStorage.setItem('compt_ea_users', JSON.stringify(usersList));
+  }, [usersList]);
 
   // Changer de type change automatiquement le code par défaut
   const handleTypeChange = (newType) => {
@@ -228,7 +238,8 @@ export default function Dashboard() {
   const handleAddUser = (e) => {
     e.preventDefault();
     if (newUserName) {
-      setUsersList([...usersList, { id: Date.now(), name: newUserName, role: newUserRole, site: newUserSite }]);
+      const updatedUsers = [...usersList, { id: Date.now(), name: newUserName, role: newUserRole, site: newUserSite }];
+      setUsersList(updatedUsers);
       setNewUserName('');
       alert('Utilisateur ajouté avec succès !');
     }
@@ -341,7 +352,7 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* 1. SAISIE (AVEC PLAN COMPTABLE DYNAMIQUE) */}
+      {/* 1. SAISIE */}
       {activeTab === 'SAISIE' && (
         <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
           <h3 style={{ margin: '0 0 16px 0', color: '#0f172a' }}>
@@ -408,7 +419,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* PLAN COMPTABLE EXCLUSIF SELON LE TYPE */}
             <div>
               <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#475569' }}>
                 COMPTE COMPTABLE ({type === 'RECETTE' ? 'Recettes seulement' : 'Dépenses seulement'})
@@ -435,7 +445,6 @@ export default function Dashboard() {
               />
             </div>
 
-            {/* PHOTO / PIÈCE JOINTE */}
             <div style={{ border: '2px dashed #cbd5e1', padding: '16px', borderRadius: '8px', textAlign: 'center' }}>
               <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#0284c7', cursor: 'pointer', display: 'block' }}>
                 📷 Prendre une photo du reçu / Télécharger la pièce
@@ -506,7 +515,7 @@ export default function Dashboard() {
             </div>
 
             <div>
-              <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#475569' }}>MONTANT À TRÀNSFÉRER FCFA</label>
+              <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#475569' }}>MONTANT À TRANSFÉRER FCFA</label>
               <input
                 type="number"
                 placeholder="Ex: 50000"
@@ -599,7 +608,6 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {/* RÉSUMÉ GLOBAL */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px' }}>
             <div style={{ padding: '12px', backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px' }}>
               <div style={{ fontSize: '11px', color: '#166534', fontWeight: 'bold' }}>TOTAL RECETTES</div>
@@ -617,7 +625,6 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* DÉTAILS PAR MODE DE PAIEMENT */}
           <h4 style={{ color: '#334155', marginBottom: '8px' }}>💳 Soldes Disponibles par Mode de Paiement</h4>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
             {MODES_PAIEMENT.map(m => (
