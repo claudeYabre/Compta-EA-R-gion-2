@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-// LISTE INITIALE DES ÉGLISES
+// LISTE INITIALE DES ÉGLISES / ASSEMBLÉES
 const INITIAL_EGLISES = [
   'Toutes les Assemblées',
   'E.A Nobéré',
@@ -30,9 +30,15 @@ const CATEGORIES_DEPENSES = [
 ];
 
 export default function Home() {
+  // Date du jour par défaut au format YYYY-MM-DD
+  const todayStr = new Date().toISOString().split('T')[0];
+
   const [solde, setSolde] = useState(1250000);
   const [type, setType] = useState('RECETTE');
   
+  // Date de l'opération
+  const [dateOperation, setDateOperation] = useState(todayStr);
+
   // Gestion de la liste des églises
   const [eglisesList, setEglisesList] = useState(INITIAL_EGLISES);
   const [eglise, setEglise] = useState('E.A Nobéré');
@@ -43,6 +49,10 @@ export default function Home() {
   const [categorieId, setCategorieId] = useState('');
   const [montant, setMontant] = useState('0');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Saisie pour Onglet Virement Interne
+  const [virementSource, setVirementSource] = useState('CAISSE_ESPECES');
+  const [virementCible, setVirementCible] = useState('MOBILE_MONEY');
 
   // Historique des transactions pour l'exportation
   const [transactions, setTransactions] = useState([
@@ -73,7 +83,7 @@ export default function Home() {
   // Filtres pour l'exportation
   const [exportEglise, setExportEglise] = useState('Toutes les Assemblées');
   const [exportMois, setExportMois] = useState('2026-08');
-  const [activeTab, setActiveTab] = useState('SAISIE'); // 'SAISIE' ou 'EXPORT'
+  const [activeTab, setActiveTab] = useState('SAISIE'); // 'SAISIE', 'VIREMENT', 'EXPORT'
 
   // Ajouter une église
   const handleAddEglise = () => {
@@ -102,8 +112,13 @@ export default function Home() {
     }
   };
 
+  // Enregistrer une Saisie Opération
   const handleValidation = () => {
     const numericMontant = parseFloat(montant);
+    if (!dateOperation) {
+      alert('Veuillez sélectionner une date.');
+      return;
+    }
     if (!categorieId) {
       alert('Veuillez sélectionner un compte / une catégorie.');
       return;
@@ -115,12 +130,11 @@ export default function Home() {
 
     const currentCatList = type === 'RECETTE' ? CATEGORIES_RECETTES : CATEGORIES_DEPENSES;
     const catLabel = currentCatList.find((c) => c.id === categorieId)?.label || '';
-    const today = new Date().toISOString().split('T')[0];
-    const currentMois = today.substring(0, 7);
+    const currentMois = dateOperation.substring(0, 7);
 
     const newTx = {
       id: Date.now(),
-      date: today,
+      date: dateOperation,
       mois: currentMois,
       eglise: eglise,
       type: type,
@@ -138,9 +152,46 @@ export default function Home() {
       setSolde((prev) => prev - numericMontant);
     }
 
-    setSuccessMsg(`Transaction de ${numericMontant.toLocaleString()} FCFA enregistrée pour : ${eglise}`);
+    setSuccessMsg(`Transaction de ${numericMontant.toLocaleString()} FCFA enregistrée le ${dateOperation} pour ${eglise}`);
     setMontant('0');
     setCategorieId('');
+    setTimeout(() => setSuccessMsg(''), 4000);
+  };
+
+  // Enregistrer un Virement Interne
+  const handleValidationVirement = () => {
+    const numericMontant = parseFloat(montant);
+    if (!dateOperation) {
+      alert('Veuillez sélectionner une date.');
+      return;
+    }
+    if (virementSource === virementCible) {
+      alert('Le compte source et le compte cible doivent être différents.');
+      return;
+    }
+    if (numericMontant <= 0) {
+      alert('Veuillez saisir un montant valide.');
+      return;
+    }
+
+    const currentMois = dateOperation.substring(0, 7);
+
+    const newTx = {
+      id: Date.now(),
+      date: dateOperation,
+      mois: currentMois,
+      eglise: eglise,
+      type: 'VIREMENT_INTERNE',
+      compteId: '580',
+      categorie: `Virement : ${virementSource} ➡️ ${virementCible}`,
+      mode: `${virementSource} -> ${virementCible}`,
+      montant: numericMontant
+    };
+
+    setTransactions([newTx, ...transactions]);
+
+    setSuccessMsg(`Virement de ${numericMontant.toLocaleString()} FCFA (${virementSource} ➡️ ${virementCible}) enregistré !`);
+    setMontant('0');
     setTimeout(() => setSuccessMsg(''), 4000);
   };
 
@@ -160,9 +211,9 @@ export default function Home() {
     let csvContent = 'data:text/csv;charset=utf-8,\uFEFF'; // UTF-8 BOM pour Excel
 
     if (typeReport === 'JOURNAL') {
-      csvContent += 'Date;Assemblee;Type;Compte;Libelle;Mode;Montant FCFA\n';
+      csvContent += 'Date;Assemblee;Type;Compte;Libelle;Mode/Virement;Montant FCFA\n';
       filtered.forEach((t) => {
-        csvContent += `${t.date};"${t.eglise}";${t.type};${t.compteId};"${t.categorie}";${t.mode};${t.montant}\n`;
+        csvContent += `${t.date};"${t.eglise}";${t.type};${t.compteId};"${t.categorie}";"${t.mode}";${t.montant}\n`;
       });
     } else if (typeReport === 'BILAN') {
       let totalRecettes = filtered.filter(t => t.type === 'RECETTE').reduce((acc, t) => acc + t.montant, 0);
@@ -210,55 +261,84 @@ export default function Home() {
         </div>
       </div>
 
-      {/* TABS : SAISIE VS EXPORTATION */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
+      {/* TABS : SAISIE / VIREMENTS / EXPORTATION */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px', marginBottom: '16px' }}>
         <button
           type="button"
           onClick={() => setActiveTab('SAISIE')}
           style={{
-            padding: '10px',
+            padding: '10px 4px',
             borderRadius: '10px',
             fontWeight: 'bold',
-            fontSize: '13px',
+            fontSize: '11px',
             border: 'none',
             cursor: 'pointer',
             backgroundColor: activeTab === 'SAISIE' ? '#0284c7' : '#e2e8f0',
             color: activeTab === 'SAISIE' ? 'white' : '#475569'
           }}
         >
-          📝 Saisie Opération
+          📝 Saisie
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('VIREMENT')}
+          style={{
+            padding: '10px 4px',
+            borderRadius: '10px',
+            fontWeight: 'bold',
+            fontSize: '11px',
+            border: 'none',
+            cursor: 'pointer',
+            backgroundColor: activeTab === 'VIREMENT' ? '#0284c7' : '#e2e8f0',
+            color: activeTab === 'VIREMENT' ? 'white' : '#475569'
+          }}
+        >
+          🔁 Virements
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('EXPORT')}
           style={{
-            padding: '10px',
+            padding: '10px 4px',
             borderRadius: '10px',
             fontWeight: 'bold',
-            fontSize: '13px',
+            fontSize: '11px',
             border: 'none',
             cursor: 'pointer',
             backgroundColor: activeTab === 'EXPORT' ? '#0284c7' : '#e2e8f0',
             color: activeTab === 'EXPORT' ? 'white' : '#475569'
           }}
         >
-          📊 Journal & Bilan (.CSV)
+          📊 Exports
         </button>
       </div>
 
-      {/* ONGLE 1 : SAISIE TRANSACTION */}
+      {/* Message de succès global */}
+      {successMsg && (
+        <div style={{ backgroundColor: '#d1fae5', border: '1px solid #34d399', color: '#065f46', padding: '12px', borderRadius: '12px', marginBottom: '16px', fontSize: '13px', fontWeight: 'bold', textAlign: 'center' }}>
+          ✅ {successMsg}
+        </div>
+      )}
+
+      {/* ONGLET 1 : SAISIE TRANSACTION */}
       {activeTab === 'SAISIE' && (
         <>
-          {/* Message de succès */}
-          {successMsg && (
-            <div style={{ backgroundColor: '#d1fae5', border: '1px solid #34d399', color: '#065f46', padding: '12px', borderRadius: '12px', marginBottom: '16px', fontSize: '13px', fontWeight: 'bold', textAlign: 'center' }}>
-              ✅ {successMsg}
-            </div>
-          )}
+          {/* SELECTION DE LA DATE */}
+          <div style={{ marginBottom: '14px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+              Date de l&apos;opération
+            </label>
+            <input
+              type="date"
+              value={dateOperation}
+              onChange={(e) => setDateOperation(e.target.value)}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', backgroundColor: 'white', fontSize: '14px', fontWeight: '600', color: '#1e293b', outline: 'none', boxSizing: 'border-box' }}
+            />
+          </div>
 
           {/* SELECTION / AJOUT DE L'EGLISE */}
-          <div style={{ marginBottom: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+          <div style={{ marginBottom: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
               <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase' }}>
                 Sélectionner l&apos;Église / Assemblée
               </label>
@@ -302,7 +382,7 @@ export default function Home() {
             <select
               value={eglise}
               onChange={(e) => setEglise(e.target.value)}
-              style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #cbd5e1', backgroundColor: 'white', fontSize: '14px', fontWeight: '600', color: '#1e293b', outline: 'none' }}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #cbd5e1', backgroundColor: 'white', fontSize: '14px', fontWeight: '600', color: '#1e293b', outline: 'none' }}
             >
               {eglisesList.filter(item => item !== 'Toutes les Assemblées').map((item) => (
                 <option key={item} value={item}>
@@ -313,7 +393,7 @@ export default function Home() {
           </div>
 
           {/* TYPE : ENTREE OU SORTIE */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px', backgroundColor: '#e2e8f0', padding: '4px', borderRadius: '12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px', backgroundColor: '#e2e8f0', padding: '4px', borderRadius: '12px' }}>
             <button
               type="button"
               onClick={() => { setType('RECETTE'); setCategorieId(''); }}
@@ -331,8 +411,8 @@ export default function Home() {
           </div>
 
           {/* MODE DE REGLEMENT */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+          <div style={{ marginBottom: '14px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
               Mode de règlement / Compte
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
@@ -354,8 +434,8 @@ export default function Home() {
           </div>
 
           {/* PLAN COMPTABLE / CATEGORIES */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+          <div style={{ marginBottom: '14px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
               Plan comptable - {type === 'RECETTE' ? 'Recettes (Classe 7)' : 'Dépenses (Classe 6)'}
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -377,20 +457,20 @@ export default function Home() {
           </div>
 
           {/* MONTANT ET PAVÉ NUMÉRIQUE */}
-          <div style={{ backgroundColor: 'white', border: '2px solid #cbd5e1', borderRadius: '16px', padding: '12px', marginBottom: '16px', textAlign: 'right' }}>
+          <div style={{ backgroundColor: 'white', border: '2px solid #cbd5e1', borderRadius: '16px', padding: '10px 14px', marginBottom: '12px', textAlign: 'right' }}>
             <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase' }}>Montant à saisir</div>
-            <div style={{ fontSize: '28px', fontWeight: '900', color: '#0f172a' }}>
-              {parseInt(montant, 10).toLocaleString()} <span style={{ fontSize: '16px', fontWeight: 'normal', color: '#64748b' }}>FCFA</span>
+            <div style={{ fontSize: '26px', fontWeight: '900', color: '#0f172a' }}>
+              {parseInt(montant, 10).toLocaleString()} <span style={{ fontSize: '15px', fontWeight: 'normal', color: '#64748b' }}>FCFA</span>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '14px' }}>
             {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'DEL'].map((btn) => (
               <button
                 key={btn}
                 type="button"
                 onClick={() => handleKeyPress(btn)}
-                style={{ padding: '14px', borderRadius: '12px', fontWeight: 'bold', fontSize: '18px', border: '1px solid #e2e8f0', cursor: 'pointer', backgroundColor: btn === 'C' ? '#ffe4e6' : btn === 'DEL' ? '#fef3c7' : 'white', color: btn === 'C' ? '#be123c' : btn === 'DEL' ? '#b45309' : '#1e293b' }}
+                style={{ padding: '12px', borderRadius: '12px', fontWeight: 'bold', fontSize: '18px', border: '1px solid #e2e8f0', cursor: 'pointer', backgroundColor: btn === 'C' ? '#ffe4e6' : btn === 'DEL' ? '#fef3c7' : 'white', color: btn === 'C' ? '#be123c' : btn === 'DEL' ? '#b45309' : '#1e293b' }}
               >
                 {btn === 'DEL' ? '⌫' : btn}
               </button>
@@ -400,14 +480,116 @@ export default function Home() {
           <button
             type="button"
             onClick={handleValidation}
-            style={{ width: '100%', padding: '16px', borderRadius: '12px', color: 'white', fontWeight: 'bold', fontSize: '18px', border: 'none', cursor: 'pointer', backgroundColor: type === 'RECETTE' ? '#059669' : '#e11d48' }}
+            style={{ width: '100%', padding: '14px', borderRadius: '12px', color: 'white', fontWeight: 'bold', fontSize: '16px', border: 'none', cursor: 'pointer', backgroundColor: type === 'RECETTE' ? '#059669' : '#e11d48' }}
           >
             Enregistrer la transaction
           </button>
         </>
       )}
 
-      {/* ONGLET 2 : EXPORTATION JOURNAL ET BILAN */}
+      {/* ONGLET 2 : VIREMENTS INTERNES */}
+      {activeTab === 'VIREMENT' && (
+        <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
+          <h3 style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#0f172a' }}>🔁 Virement Interne de Trésorerie</h3>
+          <p style={{ fontSize: '12px', color: '#64748b', marginTop: 0, marginBottom: '14px' }}>
+            Transférez des fonds entre Caisse Espèces, Mobile Money et Banque sans modifier le résultat net.
+          </p>
+
+          {/* Date du virement */}
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', display: 'block', marginBottom: '4px' }}>
+              Date du Virement :
+            </label>
+            <input
+              type="date"
+              value={dateOperation}
+              onChange={(e) => setDateOperation(e.target.value)}
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600', boxSizing: 'border-box' }}
+            />
+          </div>
+
+          {/* Assemblée concernée */}
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', display: 'block', marginBottom: '4px' }}>
+              Assemblée concernée :
+            </label>
+            <select
+              value={eglise}
+              onChange={(e) => setEglise(e.target.value)}
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600' }}
+            >
+              {eglisesList.filter(item => item !== 'Toutes les Assemblées').map((item) => (
+                <option key={item} value={item}>
+                  ⛪ {item}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Compte Source */}
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', display: 'block', marginBottom: '4px' }}>
+              1. Depuis le compte (SOURCE) :
+            </label>
+            <select
+              value={virementSource}
+              onChange={(e) => setVirementSource(e.target.value)}
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600' }}
+            >
+              <option value="CAISSE_ESPECES">💵 Caisse Espèces</option>
+              <option value="MOBILE_MONEY">📱 Mobile Money</option>
+              <option value="BANQUE">BANQUE</option>
+            </select>
+          </div>
+
+          {/* Compte Cible */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 'bold', color: '#64748b', display: 'block', marginBottom: '4px' }}>
+              2. Vers le compte (DESTINATION) :
+            </label>
+            <select
+              value={virementCible}
+              onChange={(e) => setVirementCible(e.target.value)}
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: '600' }}
+            >
+              <option value="CAISSE_ESPECES">💵 Caisse Espèces</option>
+              <option value="MOBILE_MONEY">📱 Mobile Money</option>
+              <option value="BANQUE">🏦 Banque</option>
+            </select>
+          </div>
+
+          {/* Montant Virement */}
+          <div style={{ backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '12px', padding: '10px 14px', marginBottom: '12px', textAlign: 'right' }}>
+            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 'bold', textTransform: 'uppercase' }}>Montant du Virement</div>
+            <div style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a' }}>
+              {parseInt(montant, 10).toLocaleString()} <span style={{ fontSize: '14px', fontWeight: 'normal', color: '#64748b' }}>FCFA</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'DEL'].map((btn) => (
+              <button
+                key={btn}
+                type="button"
+                onClick={() => handleKeyPress(btn)}
+                style={{ padding: '10px', borderRadius: '10px', fontWeight: 'bold', fontSize: '16px', border: '1px solid #e2e8f0', cursor: 'pointer', backgroundColor: btn === 'C' ? '#ffe4e6' : btn === 'DEL' ? '#fef3c7' : 'white', color: btn === 'C' ? '#be123c' : btn === 'DEL' ? '#b45309' : '#1e293b' }}
+              >
+                {btn === 'DEL' ? '⌫' : btn}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleValidationVirement}
+            style={{ width: '100%', padding: '14px', borderRadius: '10px', backgroundColor: '#0284c7', color: 'white', fontWeight: 'bold', border: 'none', cursor: 'pointer', fontSize: '15px' }}
+          >
+            Valider le Virement Interne
+          </button>
+        </div>
+      )}
+
+      {/* ONGLET 3 : EXPORTATION JOURNAL ET BILAN */}
       {activeTab === 'EXPORT' && (
         <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '16px', border: '1px solid #cbd5e1' }}>
           <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#0f172a' }}>📥 Filtres d&apos;exportation</h3>
@@ -463,17 +645,17 @@ export default function Home() {
 
           {/* Aperçu des dernières transactions enregistrées */}
           <h4 style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#64748b', textTransform: 'uppercase' }}>
-            Aperçu des saisies ({transactions.length})
+            Aperçu des opérations ({transactions.length})
           </h4>
           <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
             {transactions.map((t) => (
               <div key={t.id} style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
                 <div>
                   <div style={{ fontWeight: 'bold', color: '#1e293b' }}>{t.eglise} • {t.categorie}</div>
-                  <div style={{ color: '#94a3b8', fontSize: '10px' }}>{t.date} • Compte {t.compteId}</div>
+                  <div style={{ color: '#94a3b8', fontSize: '10px' }}>{t.date} • Compte {t.compteId} ({t.mode})</div>
                 </div>
-                <div style={{ fontWeight: 'bold', color: t.type === 'RECETTE' ? '#059669' : '#e11d48' }}>
-                  {t.type === 'RECETTE' ? '+' : '-'}{t.montant.toLocaleString()} F
+                <div style={{ fontWeight: 'bold', color: t.type === 'RECETTE' ? '#059669' : t.type === 'DEPENSE' ? '#e11d48' : '#0284c7' }}>
+                  {t.type === 'RECETTE' ? '+' : t.type === 'DEPENSE' ? '-' : '🔁 '}{t.montant.toLocaleString()} F
                 </div>
               </div>
             ))}
