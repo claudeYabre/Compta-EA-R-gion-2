@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 
-// PLAN COMPTABLE EXTRAIT DE L'IMAGE
 const PLAN_COMPTABLE = {
   DEPENSE: [
     { code: '101', label: '101 - Dimes des dimes' },
@@ -49,23 +48,17 @@ export default function Dashboard() {
   const router = useRouter();
   const [isOnline, setIsOnline] = useState(true);
 
+  // Utilisateur actuellement connecté
+  const [currentUser, setCurrentUser] = useState(null);
+
   // Données configurables
   const [sites, setSites] = useState(['E.A Nobéré', 'E.A Manga', 'Siège Régional 2']);
   const [newSiteName, setNewSiteName] = useState('');
 
-  const [usersList, setUsersList] = useState([
-    { id: 1, name: 'Claude Yabre', role: 'HQ_ADMIN', site: 'Siège Régional 2' },
-    { id: 2, name: 'Trésorier Manga', role: 'SITE_TRESO', site: 'E.A Manga' }
-  ]);
+  const [usersList, setUsersList] = useState([]);
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState('SITE_TRESO');
   const [newUserSite, setNewUserSite] = useState('E.A Nobéré');
-
-  const [currentUser, setCurrentUser] = useState({
-    name: 'Claude Yabre',
-    role: 'HQ_ADMIN',
-    site: 'E.A Nobéré'
-  });
 
   const [activeTab, setActiveTab] = useState('SAISIE');
   const [transactions, setTransactions] = useState([]);
@@ -86,7 +79,7 @@ export default function Dashboard() {
   const [virementCible, setVirementCible] = useState('Mobile Money');
   const [virementMontant, setVirementMontant] = useState('');
 
-  // CHARGEMENT INITIAL (Local Storage)
+  // CHARGEMENT INITIAL
   useEffect(() => {
     setIsOnline(navigator.onLine);
     const handleOnline = () => setIsOnline(true);
@@ -95,13 +88,24 @@ export default function Dashboard() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
+    // 1. Vérifier la connexion de l'utilisateur
+    const savedUser = localStorage.getItem('user');
+    if (savedUser) {
+      const parsedUser = JSON.parse(savedUser);
+      setCurrentUser(parsedUser);
+      setSelectedSite(parsedUser.site || 'E.A Nobéré');
+    } else {
+      router.push('/login');
+      return;
+    }
+
+    // 2. Charger les données du localStorage
     const localTx = localStorage.getItem('compt_ea_tx');
     if (localTx) setTransactions(JSON.parse(localTx));
 
     const localSites = localStorage.getItem('compt_ea_sites');
     if (localSites) setSites(JSON.parse(localSites));
 
-    // CHARGEMENT DES UTILISATEURS
     const localUsers = localStorage.getItem('compt_ea_users');
     if (localUsers) setUsersList(JSON.parse(localUsers));
 
@@ -111,20 +115,31 @@ export default function Dashboard() {
     };
   }, []);
 
-  // SAUVEGARDE AUTOMATIQUE
+  // SAUVEGARDES AUTOMATIQUES
   useEffect(() => {
-    localStorage.setItem('compt_ea_tx', JSON.stringify(transactions));
+    if (transactions.length > 0) {
+      localStorage.setItem('compt_ea_tx', JSON.stringify(transactions));
+    }
   }, [transactions]);
 
   useEffect(() => {
-    localStorage.setItem('compt_ea_sites', JSON.stringify(sites));
+    if (sites.length > 0) {
+      localStorage.setItem('compt_ea_sites', JSON.stringify(sites));
+    }
   }, [sites]);
 
   useEffect(() => {
-    localStorage.setItem('compt_ea_users', JSON.stringify(usersList));
+    if (usersList.length > 0) {
+      localStorage.setItem('compt_ea_users', JSON.stringify(usersList));
+    }
   }, [usersList]);
 
-  // Changer de type change automatiquement le code par défaut
+  // DECONNEXION PROPRE
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+  };
+
   const handleTypeChange = (newType) => {
     setType(newType);
     setCodeCompte(PLAN_COMPTABLE[newType][0].code);
@@ -182,7 +197,6 @@ export default function Dashboard() {
     setPieceJointe(null);
   };
 
-  // Virement interne entre modes de paiement
   const handleVirement = (e) => {
     e.preventDefault();
     if (virementSource === virementCible) {
@@ -224,7 +238,6 @@ export default function Dashboard() {
     alert('Virement interne effectué avec succès !');
   };
 
-  // Ajout Assemblée
   const handleAddSite = (e) => {
     e.preventDefault();
     if (newSiteName && !sites.includes(newSiteName)) {
@@ -234,7 +247,6 @@ export default function Dashboard() {
     }
   };
 
-  // Ajout Utilisateur
   const handleAddUser = (e) => {
     e.preventDefault();
     if (newUserName) {
@@ -258,7 +270,6 @@ export default function Dashboard() {
     setActiveTab('SAISIE');
   };
 
-  // Exportation CSV
   const handleExportCSV = () => {
     let csv = 'ID;Date;Site;Type;Code Compte;Mode Paiement;Libelle;Montant (FCFA)\n';
     transactions.forEach(t => {
@@ -277,12 +288,10 @@ export default function Dashboard() {
     window.print();
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    router.push('/login');
-  };
+  if (!currentUser) {
+    return <div style={{ padding: '20px', textAlign: 'center' }}>Chargement...</div>;
+  }
 
-  // Calculs Bilan
   const filteredTx = transactions.filter(t => t.site === selectedSite);
   const totalRecettes = filteredTx.filter(t => t.type === 'RECETTE').reduce((a, b) => a + b.montant, 0);
   const totalDepenses = filteredTx.filter(t => t.type === 'DEPENSE').reduce((a, b) => a + b.montant, 0);
@@ -305,13 +314,13 @@ export default function Dashboard() {
           </div>
           <div>
             <div style={{ fontWeight: 'bold', fontSize: '15px' }}>COMPT-EA</div>
-            <div style={{ fontSize: '10px', color: '#94a3b8' }}>{currentUser.name} ({currentUser.role})</div>
+            <div style={{ fontSize: '11px', color: '#38bdf8', fontWeight: 'bold' }}>👤 {currentUser.name} ({currentUser.role})</div>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '11px', fontWeight: 'bold', padding: '4px 8px', borderRadius: '20px', backgroundColor: isOnline ? '#166534' : '#991b1b', color: 'white' }}>
-            {isOnline ? '🟢 En ligne' : '🔴 Mode Hors-Réseau'}
+            {isOnline ? '🟢 En ligne' : '🔴 Hors-Réseau'}
           </span>
 
           <button
