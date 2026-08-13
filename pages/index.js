@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { supabase } from '../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+// Initialisation sécurisée directe du client Supabase
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const PLAN_COMPTABLE = {
   DEPENSE: [
@@ -50,7 +55,7 @@ export default function DashboardPleinEcran() {
   const [isOnline, setIsOnline] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Données
+  // Données centralisées
   const [sites, setSites] = useState([]);
   const [newSiteName, setNewSiteName] = useState('');
   const [usersList, setUsersList] = useState([]);
@@ -61,7 +66,7 @@ export default function DashboardPleinEcran() {
   const [activeTab, setActiveTab] = useState('DASHBOARD');
   const [transactions, setTransactions] = useState([]);
 
-  // Formulaire Saisie
+  // Formulaire de Saisie
   const [selectedSite, setSelectedSite] = useState('');
   const [dateOp, setDateOp] = useState(new Date().toISOString().split('T')[0]);
   const [type, setType] = useState('RECETTE');
@@ -72,7 +77,7 @@ export default function DashboardPleinEcran() {
   const [pieceJointe, setPieceJointe] = useState(null);
   const [editingId, setEditingId] = useState(null);
 
-  // Formulaire Virement
+  // Formulaire de Virement
   const [virementSource, setVirementSource] = useState('Espèces');
   const [virementCible, setVirementCible] = useState('Mobile Money');
   const [virementMontant, setVirementMontant] = useState('');
@@ -104,6 +109,7 @@ export default function DashboardPleinEcran() {
   }, []);
 
   const loadCentralData = async () => {
+    // 1. Charger les sites/assemblées
     const { data: dbSites } = await supabase.from('sites').select('*');
     if (dbSites && dbSites.length > 0) {
       const siteNames = dbSites.map(s => s.name || s.nom);
@@ -112,9 +118,11 @@ export default function DashboardPleinEcran() {
       setNewUserSite(siteNames[0]);
     }
 
+    // 2. Charger toutes les opérations
     const { data: dbTx } = await supabase.from('operations').select('*').order('id', { ascending: false });
     if (dbTx) setTransactions(dbTx);
 
+    // 3. Charger les utilisateurs
     const { data: dbUsers } = await supabase.from('profiles').select('*');
     if (dbUsers) setUsersList(dbUsers);
   };
@@ -138,6 +146,7 @@ export default function DashboardPleinEcran() {
     }
   };
 
+  // 1. Saisie / Modification
   const handleSaveEcriture = async (e) => {
     e.preventDefault();
     if (!montant || parseFloat(montant) <= 0) {
@@ -178,6 +187,7 @@ export default function DashboardPleinEcran() {
     setPieceJointe(null);
   };
 
+  // 2. Virement interne entre caisses
   const handleVirement = async (e) => {
     e.preventDefault();
     if (virementSource === virementCible) {
@@ -202,6 +212,7 @@ export default function DashboardPleinEcran() {
     }
   };
 
+  // 3. Gestion Assemblées
   const handleAddSite = async (e) => {
     e.preventDefault();
     if (newSiteName && !sites.includes(newSiteName)) {
@@ -214,6 +225,7 @@ export default function DashboardPleinEcran() {
     }
   };
 
+  // 4. Gestion Utilisateurs
   const handleAddUser = async (e) => {
     e.preventDefault();
     if (newUserName) {
@@ -239,7 +251,21 @@ export default function DashboardPleinEcran() {
     setActiveTab('SAISIE');
   };
 
-  // Calculs Financiers
+  const handleExportCSV = () => {
+    let csv = 'ID;Date;Site;Type;Code Compte;Mode Paiement;Libelle;Montant (FCFA)\n';
+    filteredTx.forEach(t => {
+      csv += `${t.id};${t.date};${t.site};${t.type};${t.codeCompte};${t.modePaiement || 'Espèces'};${t.libelle};${t.montant}\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `journal_${selectedSite}.csv`);
+    document.body.appendChild(link);
+    link.click();
+  };
+
+  // Calculs financiers
   const filteredTx = transactions.filter(t => t.site === selectedSite);
   const totalRecettes = filteredTx.filter(t => t.type === 'RECETTE').reduce((a, b) => a + b.montant, 0);
   const totalDepenses = filteredTx.filter(t => t.type === 'DEPENSE').reduce((a, b) => a + b.montant, 0);
@@ -251,28 +277,20 @@ export default function DashboardPleinEcran() {
     return rec - dep;
   };
 
-  // Regroupement par Compte (pour widget dépense)
-  const depensesParCompte = filteredTx
-    .filter(t => t.type === 'DEPENSE')
-    .reduce((acc, curr) => {
-      acc[curr.codeCompte] = (acc[curr.codeCompte] || 0) + curr.montant;
-      return acc;
-    }, {});
-
-  if (!currentUser) return <div style={{ display: 'grid', placeItems: 'center', height: '100vh', background: '#0f172a', color: 'white' }}>Chargement...</div>;
+  if (!currentUser) return <div style={{ display: 'grid', placeItems: 'center', height: '100vh', background: '#0f172a', color: 'white' }}>Chargement de COMPT-EA...</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden', backgroundColor: '#f1f5f9', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       
-      {/* HEADER SUPERIEUR */}
+      {/* BARRE EN-TÊTE PLEIN ÉCRAN */}
       <header style={{ height: '60px', backgroundColor: '#0f172a', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <div style={{ fontWeight: '900', fontSize: '18px', letterSpacing: '1px', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span>🏛️</span> COMPT-EA <span style={{ fontSize: '10px', backgroundColor: '#0284c7', color: 'white', padding: '2px 6px', borderRadius: '4px' }}>PRO</span>
+            <span>🏛️</span> COMPT-EA <span style={{ fontSize: '10px', backgroundColor: '#0284c7', color: 'white', padding: '2px 6px', borderRadius: '4px' }}>HQ</span>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#1e293b', padding: '4px 12px', borderRadius: '8px' }}>
-            <span style={{ fontSize: '12px', color: '#94a3b8' }}>Site actif :</span>
+            <span style={{ fontSize: '12px', color: '#94a3b8' }}>Site :</span>
             <select 
               value={selectedSite} 
               onChange={(e) => setSelectedSite(e.target.value)}
@@ -283,13 +301,14 @@ export default function DashboardPleinEcran() {
           </div>
         </div>
 
-        {/* NAVIGATION NAVBAR */}
-        <nav style={{ display: 'flex', gap: '8px' }}>
+        {/* NAVIGATION DES ONGLETS */}
+        <nav style={{ display: 'flex', gap: '6px' }}>
           {[
-            { id: 'DASHBOARD', label: '📊 Tableau de Bord' },
+            { id: 'DASHBOARD', label: '📊 Dashboard & Widgets' },
             { id: 'SAISIE', label: '📝 Nouvelle Saisie' },
             { id: 'VIREMENT', label: '🔄 Virement' },
-            { id: 'JOURNAL', label: '📖 Journal' },
+            { id: 'JOURNAL', label: '📖 Journal Direct' },
+            { id: 'BILAN', label: '📈 Bilan Financier' },
             { id: 'SITES', label: '⚙️ Assemblées' },
             { id: 'USERS', label: '👥 Utilisateurs' }
           ].map(tab => (
@@ -298,12 +317,11 @@ export default function DashboardPleinEcran() {
               onClick={() => setActiveTab(tab.id)}
               style={{
                 border: 'none',
-                padding: '8px 14px',
+                padding: '8px 12px',
                 borderRadius: '6px',
-                fontSize: '13px',
+                fontSize: '12px',
                 fontWeight: '600',
                 cursor: 'pointer',
-                transition: 'all 0.2s',
                 backgroundColor: activeTab === tab.id ? '#0284c7' : 'transparent',
                 color: activeTab === tab.id ? 'white' : '#94a3b8'
               }}
@@ -313,93 +331,90 @@ export default function DashboardPleinEcran() {
           ))}
         </nav>
 
-        {/* PROFIL & ETAT */}
+        {/* ETAT & UTILISATEUR */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <span style={{ fontSize: '11px', padding: '4px 8px', borderRadius: '20px', backgroundColor: isOnline ? '#166534' : '#991b1b', color: 'white', fontWeight: 'bold' }}>
-            {isOnline ? '● En ligne' : '○ Hors-ligne'}
+            {isOnline ? '● Synchronisé' : '○ Hors-ligne'}
           </span>
           <div style={{ textAlign: 'right', fontSize: '12px' }}>
             <div style={{ fontWeight: 'bold' }}>{currentUser.name}</div>
             <div style={{ color: '#38bdf8', fontSize: '10px' }}>{currentUser.role}</div>
           </div>
           <button onClick={handleLogout} style={{ background: '#334155', border: 'none', color: '#f87171', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>
-            Déconnexion
+            🚪
           </button>
         </div>
       </header>
 
-      {/* ZONE DE CONTENU PRINCIPALE (FULL SCREEN) */}
+      {/* CONTENU PRINCIPALE (FULL SCREEN GRID) */}
       <main style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
         
-        {/* 1. TABLEAU DE BORD EXÉCUTIF (WIDGETS) */}
+        {/* 1. TABLEAU DE BORD EXÉCUTIF AVEC WIDGETS */}
         {activeTab === 'DASHBOARD' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%' }}>
             
-            {/* RANGÉE 1: CARTE DE SYNTHÈSE RAPIDE */}
+            {/* CARTE DES INDICATEURS CLÉS */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
               <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', borderLeft: '4px solid #10b981' }}>
                 <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold' }}>TOTAL RECETTES</div>
-                <div style={{ fontSize: '24px', fontWeight: '800', color: '#059669', marginTop: '4px' }}>{totalRecettes.toLocaleString()} <span style={{ fontSize: '12px' }}>FCFA</span></div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#059669', marginTop: '4px' }}>{totalRecettes.toLocaleString()} <span style={{ fontSize: '12px' }}>FCFA</span></div>
               </div>
 
               <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', borderLeft: '4px solid #f43f5e' }}>
                 <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold' }}>TOTAL DÉPENSES</div>
-                <div style={{ fontSize: '24px', fontWeight: '800', color: '#e11d48', marginTop: '4px' }}>{totalDepenses.toLocaleString()} <span style={{ fontSize: '12px' }}>FCFA</span></div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#e11d48', marginTop: '4px' }}>{totalDepenses.toLocaleString()} <span style={{ fontSize: '12px' }}>FCFA</span></div>
               </div>
 
               <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', borderLeft: `4px solid ${soldeNet >= 0 ? '#0284c7' : '#d97706'}` }}>
-                <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold' }}>SOLDE NET EN CAISSE</div>
-                <div style={{ fontSize: '24px', fontWeight: '800', color: soldeNet >= 0 ? '#0284c7' : '#d97706', marginTop: '4px' }}>{soldeNet.toLocaleString()} <span style={{ fontSize: '12px' }}>FCFA</span></div>
+                <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold' }}>SOLDE NET DISPONIBLE</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: soldeNet >= 0 ? '#0284c7' : '#d97706', marginTop: '4px' }}>{soldeNet.toLocaleString()} <span style={{ fontSize: '12px' }}>FCFA</span></div>
               </div>
 
               <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', borderLeft: '4px solid #6366f1' }}>
-                <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold' }}>NOMBRE D&apos;OPÉRATIONS</div>
-                <div style={{ fontSize: '24px', fontWeight: '800', color: '#4f46e5', marginTop: '4px' }}>{filteredTx.length}</div>
+                <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold' }}>ÉCRITURES ENREGISTRÉES</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: '#4f46e5', marginTop: '4px' }}>{filteredTx.length}</div>
               </div>
             </div>
 
-            {/* RANGÉE 2: WIDGETS PAR MODE & ANALYSE COMPTABILITÉ */}
+            {/* GRILLE DYNAMIQUE DES WIDGETS */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', flex: 1 }}>
               
-              {/* WIDGET VENTILATION PAR COMPTE/MODE */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                
-                {/* SOLDE PAR MODE DE PAIEMENT */}
+                {/* WIDGET : RÉPARTITION PAR MODE */}
                 <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                  <h4 style={{ margin: '0 0 16px 0', color: '#0f172a', fontSize: '14px' }}>💳 Répartition par Mode de Paiement</h4>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <h4 style={{ margin: '0 0 16px 0', color: '#0f172a', fontSize: '14px' }}>💳 Soldes par Mode de Paiement</h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                     {MODES_PAIEMENT.map(m => {
                       const val = soldeMode(m);
                       return (
                         <div key={m} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                           <span style={{ fontWeight: '600', fontSize: '13px', color: '#334155' }}>{m}</span>
-                          <span style={{ fontWeight: 'bold', fontSize: '14px', color: val >= 0 ? '#0f172a' : '#be123c' }}>{val.toLocaleString()} FCFA</span>
+                          <span style={{ fontWeight: 'bold', fontSize: '14px', color: val >= 0 ? '#0f172a' : '#be123c' }}>{val.toLocaleString()} F</span>
                         </div>
                       );
                     })}
                   </div>
                 </div>
 
-                {/* WIDGET SANTÉ FINANCIÈRE */}
-                <div style={{ backgroundColor: '#0f172a', color: 'white', padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                {/* WIDGET : DASHBOARD SANTE FINANCIERE */}
+                <div style={{ backgroundColor: '#0f172a', color: 'white', padding: '20px', borderRadius: '12px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', flex: 1 }}>
                   <div>
-                    <div style={{ fontSize: '12px', color: '#38bdf8', fontWeight: 'bold', textTransform: 'uppercase' }}>Indicateur de Gestion</div>
-                    <div style={{ fontSize: '16px', fontWeight: 'bold', marginTop: '6px' }}>
-                      {totalRecettes > 0 ? `Ratio Dépenses/Recettes : ${((totalDepenses / totalRecettes) * 100).toFixed(1)}%` : 'Aucune entrée enregistrée'}
+                    <div style={{ fontSize: '11px', color: '#38bdf8', fontWeight: 'bold', textTransform: 'uppercase' }}>Évaluation Budgétaire</div>
+                    <div style={{ fontSize: '15px', fontWeight: 'bold', marginTop: '8px' }}>
+                      {totalRecettes > 0 ? `Ratio de Dépense : ${((totalDepenses / totalRecettes) * 100).toFixed(1)}%` : 'Pas de recettes'}
                     </div>
                   </div>
-                  <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '12px' }}>
-                    {soldeNet > 0 ? '🟢 La situation financière de l\'assemblée est saine.' : '🔴 Attentions, le niveau des dépenses dépasse les entrées.'}
+                  <div style={{ fontSize: '12px', color: '#94a3b8' }}>
+                    {soldeNet >= 0 ? '✅ Budget maîtrisé sur ce site.' : '⚠️ Attention : Solde négatif détecté.'}
                   </div>
                 </div>
-
               </div>
 
-              {/* WIDGET DERNIÈRES OPÉRATIONS INTERACTIVES */}
+              {/* WIDGET : DERNIÈRES ÉCRITURES */}
               <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h4 style={{ margin: 0, color: '#0f172a', fontSize: '14px' }}>⚡ Dernières Opérations Saisies</h4>
-                  <button onClick={() => setActiveTab('JOURNAL')} style={{ background: 'none', border: 'none', color: '#0284c7', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>Voir tout →</button>
+                  <h4 style={{ margin: 0, color: '#0f172a', fontSize: '14px' }}>⚡ Récents Mouvements ({selectedSite})</h4>
+                  <button onClick={() => setActiveTab('JOURNAL')} style={{ background: 'none', border: 'none', color: '#0284c7', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>Grand Journal →</button>
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -407,13 +422,13 @@ export default function DashboardPleinEcran() {
                     <thead>
                       <tr style={{ borderBottom: '2px solid #f1f5f9', color: '#64748b', textAlign: 'left' }}>
                         <th style={{ padding: '8px' }}>Date</th>
-                        <th style={{ padding: '8px' }}>Compte</th>
+                        <th style={{ padding: '8px' }}>Code</th>
                         <th style={{ padding: '8px' }}>Libellé</th>
                         <th style={{ padding: '8px', textAlign: 'right' }}>Montant</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredTx.slice(0, 7).map(t => (
+                      {filteredTx.slice(0, 8).map(t => (
                         <tr key={t.id} style={{ borderBottom: '1px solid #f8fafc' }}>
                           <td style={{ padding: '10px 8px', color: '#64748b' }}>{t.date}</td>
                           <td style={{ padding: '10px 8px', fontWeight: 'bold' }}>{t.codeCompte}</td>
@@ -433,22 +448,22 @@ export default function DashboardPleinEcran() {
           </div>
         )}
 
-        {/* 2. FORMULAIRE DE SAISIE AVANCÉ */}
+        {/* 2. FORMULAIRE DE SAISIE */}
         {activeTab === 'SAISIE' && (
           <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%', backgroundColor: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
-            <h3 style={{ margin: '0 0 20px 0', color: '#0f172a' }}>{editingId ? '✏️ Modifier une Écriture' : '📝 Enregistrer une Opération'}</h3>
+            <h3 style={{ margin: '0 0 20px 0', color: '#0f172a' }}>{editingId ? '✏️ Correction de l\'Écriture' : '📝 Enregistrement d\'une Opération'}</h3>
 
             <form onSubmit={handleSaveEcriture} style={{ display: 'grid', gap: '16px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '6px' }}>DATE DE L&apos;OPÉRATION</label>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '6px' }}>DATE</label>
                   <input type="date" value={dateOp} onChange={(e) => setDateOp(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '6px' }}>TYPE D&apos;OPÉRATION</label>
+                  <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '6px' }}>SENS COMPTABLE</label>
                   <select value={type} onChange={(e) => handleTypeChange(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
-                    <option value="RECETTE">Recette (Entrée de fonds)</option>
-                    <option value="DEPENSE">Dépense (Sortie de fonds)</option>
+                    <option value="RECETTE">Recette (Entrée)</option>
+                    <option value="DEPENSE">Dépense (Sortie)</option>
                   </select>
                 </div>
               </div>
@@ -462,32 +477,32 @@ export default function DashboardPleinEcran() {
                 </div>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '6px' }}>MONTANT FCFA</label>
-                  <input type="number" placeholder="Ex: 50000" value={montant} onChange={(e) => setMontant(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
+                  <input type="number" placeholder="Ex: 25000" value={montant} onChange={(e) => setMontant(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
                 </div>
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '6px' }}>COMPTE COMPTABLE</label>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '6px' }}>COMPTE DU PLAN COMPTABLE</label>
                 <select value={codeCompte} onChange={(e) => setCodeCompte(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', backgroundColor: type === 'RECETTE' ? '#f0fdf4' : '#fef2f2' }}>
                   {PLAN_COMPTABLE[type].map(item => <option key={item.code} value={item.code}>{item.label}</option>)}
                 </select>
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '6px' }}>LIBELLÉ DE L&apos;OPÉRATION</label>
-                <input type="text" placeholder="Précisez l'objet de l'écriture..." value={libelle} onChange={(e) => setLibelle(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '6px' }}>LIBELLÉ / PRÉCISION</label>
+                <input type="text" placeholder="Détail optionnel..." value={libelle} onChange={(e) => setLibelle(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
               </div>
 
               <div style={{ border: '2px dashed #cbd5e1', padding: '16px', borderRadius: '8px', textAlign: 'center' }}>
                 <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#0284c7', cursor: 'pointer', display: 'block' }}>
-                  📷 Attacher un reçu / justificatif
+                  📷 Joindre une photo du justificatif / Reçu
                   <input type="file" accept="image/*,application/pdf" capture="environment" onChange={handleFileUpload} style={{ display: 'none' }} />
                 </label>
-                {pieceJointe && <div style={{ marginTop: '8px', color: '#15803d', fontSize: '12px', fontWeight: 'bold' }}>✅ Preuve numérisée liée</div>}
+                {pieceJointe && <div style={{ marginTop: '8px', color: '#15803d', fontSize: '12px', fontWeight: 'bold' }}>✅ Fichier attaché</div>}
               </div>
 
               <button type="submit" style={{ padding: '14px', borderRadius: '8px', backgroundColor: editingId ? '#d97706' : '#059669', color: 'white', fontWeight: 'bold', border: 'none', cursor: 'pointer', fontSize: '15px' }}>
-                {editingId ? 'Mettre à jour l\'écriture' : 'Valider et Sauvegarder'}
+                {editingId ? 'Confirmer les modifications' : 'Enregistrer sur le serveur'}
               </button>
             </form>
           </div>
@@ -499,44 +514,56 @@ export default function DashboardPleinEcran() {
             <h3 style={{ margin: '0 0 16px 0', color: '#0f172a' }}>🔄 Transfert Interne entre Caisses</h3>
             <form onSubmit={handleVirement} style={{ display: 'grid', gap: '16px' }}>
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '6px' }}>DEPUIS LA CAISSE (PROVENANCE)</label>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '6px' }}>CAISSE DÉBITÉE (SOURCE)</label>
                 <select value={virementSource} onChange={(e) => setVirementSource(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
                   {MODES_PAIEMENT.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '6px' }}>VERS LA CAISSE (DESTINATION)</label>
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '6px' }}>CAISSE CRÉDITÉE (DESTINATION)</label>
                 <select value={virementCible} onChange={(e) => setVirementCible(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
                   {MODES_PAIEMENT.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
 
               <div>
-                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '6px' }}>MONTANT DU TRANSFERT FCFA</label>
-                <input type="number" placeholder="Ex: 100000" value={virementMontant} onChange={(e) => setVirementMontant(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
+                <label style={{ fontSize: '12px', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '6px' }}>MONTANT DU VIREMENT FCFA</label>
+                <input type="number" placeholder="Ex: 50000" value={virementMontant} onChange={(e) => setVirementMontant(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }} />
               </div>
 
               <button type="submit" style={{ padding: '14px', borderRadius: '8px', backgroundColor: '#0284c7', color: 'white', fontWeight: 'bold', border: 'none', cursor: 'pointer', fontSize: '15px' }}>
-                Exécuter le Transfert
+                Valider le Virement
               </button>
             </form>
           </div>
         )}
 
-        {/* 4. JOURNAL COMPLET */}
+        {/* 4. JOURNAL DE COMPTABILITÉ */}
         {activeTab === 'JOURNAL' && (
           <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <h3 style={{ margin: '0 0 16px 0', color: '#0f172a' }}>📖 Grand Journal des Écritures ({selectedSite})</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, color: '#0f172a' }}>📖 Grand Journal des Écritures ({selectedSite})</h3>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={handleExportCSV} style={{ backgroundColor: '#15803d', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
+                  📥 Exporter Excel/CSV
+                </button>
+                <button onClick={() => window.print()} style={{ backgroundColor: '#475569', color: 'white', border: 'none', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}>
+                  🖨️ Imprimer
+                </button>
+              </div>
+            </div>
+
             <div style={{ flex: 1, overflowY: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                     <th style={{ padding: '10px' }}>Date</th>
-                    <th style={{ padding: '10px' }}>Code</th>
+                    <th style={{ padding: '10px' }}>Compte</th>
                     <th style={{ padding: '10px' }}>Mode</th>
                     <th style={{ padding: '10px' }}>Libellé</th>
                     <th style={{ padding: '10px' }}>Montant</th>
+                    <th style={{ padding: '10px' }}>Preuve</th>
                     <th style={{ padding: '10px' }}>Action</th>
                   </tr>
                 </thead>
@@ -550,6 +577,7 @@ export default function DashboardPleinEcran() {
                       <td style={{ padding: '10px', fontWeight: 'bold', color: t.type === 'RECETTE' ? '#059669' : '#e11d48' }}>
                         {t.type === 'RECETTE' ? '+' : '-'}{t.montant.toLocaleString()} F
                       </td>
+                      <td style={{ padding: '10px' }}>{t.pieceJointe ? '📄' : '-'}</td>
                       <td style={{ padding: '10px' }}>
                         <button onClick={() => handleEdit(t)} style={{ backgroundColor: '#f59e0b', color: 'white', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold' }}>
                           ✏️ Corriger
@@ -563,33 +591,59 @@ export default function DashboardPleinEcran() {
           </div>
         )}
 
-        {/* 5. GESTION SITES & USERS */}
+        {/* 5. BILAN FINANCIER */}
+        {activeTab === 'BILAN' && (
+          <div style={{ backgroundColor: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+            <h3 style={{ margin: '0 0 16px 0', color: '#0f172a' }}>📊 Bilan Financier Officiel - {selectedSite}</h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+              <div style={{ padding: '16px', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+                <div style={{ fontSize: '12px', color: '#166534', fontWeight: 'bold' }}>RECETTES TOTALES</div>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#15803d' }}>{totalRecettes.toLocaleString()} FCFA</div>
+              </div>
+              <div style={{ padding: '16px', backgroundColor: '#fef2f2', borderRadius: '8px', border: '1px solid #fecaca' }}>
+                <div style={{ fontSize: '12px', color: '#991b1b', fontWeight: 'bold' }}>DÉPENSES TOTALES</div>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#be123c' }}>{totalDepenses.toLocaleString()} FCFA</div>
+              </div>
+              <div style={{ padding: '16px', backgroundColor: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                <div style={{ fontSize: '12px', color: '#075985', fontWeight: 'bold' }}>SOLDE COMPTABLE NET</div>
+                <div style={{ fontSize: '20px', fontWeight: 'bold', color: soldeNet >= 0 ? '#0369a1' : '#be123c' }}>{soldeNet.toLocaleString()} FCFA</div>
+              </div>
+            </div>
+
+            <button onClick={() => window.print()} style={{ backgroundColor: '#0f172a', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>
+              🖨️ Imprimer le Rapport Financier
+            </button>
+          </div>
+        )}
+
+        {/* 6. GESTION DES SITES & UTILSATEURS */}
         {activeTab === 'SITES' && (
           <div style={{ maxWidth: '600px', margin: '0 auto', width: '100%', backgroundColor: 'white', padding: '24px', borderRadius: '12px' }}>
-            <h3 style={{ margin: '0 0 16px 0' }}>🏛️ Ajouter une Assemblée</h3>
+            <h3 style={{ margin: '0 0 16px 0' }}>🏛️ Ajouter une Assemblée / Site</h3>
             <form onSubmit={handleAddSite} style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-              <input type="text" placeholder="Nom de l'assemblée" value={newSiteName} onChange={(e) => setNewSiteName(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
+              <input type="text" placeholder="Nom du site" value={newSiteName} onChange={(e) => setNewSiteName(e.target.value)} style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
               <button type="submit" style={{ backgroundColor: '#059669', color: 'white', border: 'none', padding: '10px 16px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>Ajouter</button>
             </form>
-            <h4>Assemblées existantes :</h4>
+            <h4>Liste des sites configurés :</h4>
             <ul>{sites.map(s => <li key={s} style={{ padding: '6px 0', fontWeight: 'bold' }}>📍 {s}</li>)}</ul>
           </div>
         )}
 
         {activeTab === 'USERS' && (
           <div style={{ maxWidth: '600px', margin: '0 auto', width: '100%', backgroundColor: 'white', padding: '24px', borderRadius: '12px' }}>
-            <h3 style={{ margin: '0 0 16px 0' }}>👥 Ajouter un Utilisateur HQ</h3>
+            <h3 style={{ margin: '0 0 16px 0' }}>👥 Ajouter un Utilisateur</h3>
             <form onSubmit={handleAddUser} style={{ display: 'grid', gap: '12px', marginBottom: '20px' }}>
               <input type="text" placeholder="Nom complet" value={newUserName} onChange={(e) => setNewUserName(e.target.value)} style={{ padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
               <select value={newUserRole} onChange={(e) => setNewUserRole(e.target.value)} style={{ padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
                 <option value="SITE_TRESO">Trésorier de Site</option>
-                <option value="HQ_COMPTABLE">Comptable HQ / Siège</option>
-                <option value="HQ_ADMIN">Administrateur Général</option>
+                <option value="HQ_COMPTABLE">Comptable Siège</option>
+                <option value="HQ_ADMIN">Administrateur</option>
               </select>
               <select value={newUserSite} onChange={(e) => setNewUserSite(e.target.value)} style={{ padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }}>
                 {sites.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-              <button type="submit" style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '10px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>Créer l'utilisateur</button>
+              <button type="submit" style={{ backgroundColor: '#0284c7', color: 'white', border: 'none', padding: '10px', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' }}>Créer le compte</button>
             </form>
           </div>
         )}
